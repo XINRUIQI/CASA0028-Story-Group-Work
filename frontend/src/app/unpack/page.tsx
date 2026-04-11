@@ -21,23 +21,34 @@ function UnpackContent() {
 
   useEffect(() => {
     if (!origin || !destination) return;
-    setLoading(true);
-    api
-      .planJourney(origin, destination, time)
-      .then(async (res) => {
+    let cancelled = false;
+    void (async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const res = await api.planJourney(origin, destination, time);
+        if (cancelled) return;
         const j = res.journeys[0] || null;
         setJourney(j);
         if (j) {
           try {
             const support = await api.getRouteSupport(j.legs);
-            setSupportCards(support.support_cards);
+            if (!cancelled) setSupportCards(support.support_cards);
           } catch {
-            setSupportCards([]);
+            if (!cancelled) setSupportCards([]);
           }
+        } else {
+          setSupportCards([]);
         }
-      })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [origin, destination, time]);
 
   const supportLookup = new Map<string, SupportCard>();

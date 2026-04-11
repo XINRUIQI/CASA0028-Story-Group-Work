@@ -19,7 +19,17 @@ A decision-support prototype for CASA0028, exploring how public transport journe
 │   ├── raw/               Raw downloaded datasets (git-ignored)
 │   ├── processed/         Cleaned GeoJSON / JSON files
 │   └── scripts/           ETL pipeline scripts
+└── .github/workflows/     GitHub Actions (CI)
 ```
+
+## Continuous Integration (GitHub Actions)
+
+On every push and pull request to `main` or `master`, [CI](.github/workflows/ci.yml) runs:
+
+- **Frontend:** `npm ci`, `npm run lint`, `npm run build` (Node 20)
+- **Backend:** install `backend/requirements.txt`, import `backend.main`, `compileall`
+
+No secrets are required for CI. After pushing this workflow to GitHub, open the repository’s **Actions** tab to see runs.
 
 ## Quick Start
 

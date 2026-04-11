@@ -1,16 +1,7 @@
 "use client";
 
 import { Leg, SupportCard } from "@/lib/api";
-import {
-  Footprints,
-  Clock,
-  Train,
-  Bus,
-  ArrowLeftRight,
-  Shield,
-  Store,
-  Lightbulb,
-} from "lucide-react";
+import { Footprints, Clock, Train, Bus } from "lucide-react";
 
 interface SegmentCardProps {
   index: number;
