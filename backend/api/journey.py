@@ -12,6 +12,11 @@ from backend.core.config import TFL_BASE_URL, TFL_API_KEY
 router = APIRouter(prefix="/journey", tags=["journey"])
 
 
+def _to_tfl_time(t: str) -> str:
+    """Convert 'HH:MM' to 'HHmm' as required by TfL API."""
+    return t.replace(":", "")
+
+
 async def _tfl_get(path: str, params: Optional[dict] = None) -> dict:
     params = params or {}
     if TFL_API_KEY:
@@ -96,7 +101,7 @@ async def plan_journey(
     Returns parsed journey options.
     """
     params = {
-        "time": time,
+        "time": _to_tfl_time(time),
         "timeIs": "Departing",
         "journeyPreference": "LeastTime",
         "mode": "tube,bus,dlr,overground,elizabeth-line,walking",
@@ -131,7 +136,7 @@ async def compare_journey(
 
     for t in time_list:
         params = {
-            "time": t,
+            "time": _to_tfl_time(t),
             "timeIs": "Departing",
             "journeyPreference": "LeastTime",
             "mode": "tube,bus,dlr,overground,elizabeth-line,walking",
@@ -141,7 +146,6 @@ async def compare_journey(
 
         data = await _tfl_get(f"/Journey/JourneyResults/{origin}/to/{destination}", params)
         journeys = [_parse_journey(j) for j in data.get("journeys", [])]
-        # Take the top journey for each time slot for comparison
         results[t] = journeys[0] if journeys else None
 
     return {
