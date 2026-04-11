@@ -52,7 +52,8 @@ export default function StopPointSearch({
         const res = await api.searchStopPoint(val);
         setMatches(res.matches);
         setOpen(true);
-      } catch {
+      } catch (err) {
+        console.error("[StopPointSearch] fetch failed:", err);
         setMatches([]);
       } finally {
         setLoading(false);
