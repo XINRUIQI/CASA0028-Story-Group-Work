@@ -31,6 +31,18 @@ On every push and pull request to `main` or `master`, [CI](.github/workflows/ci.
 
 No secrets are required for CI. After pushing this workflow to GitHub, open the repository’s **Actions** tab to see runs.
 
+### Deployed website (GitHub Pages)
+
+The **CI** workflow (`ci.yml`) only checks that the code builds; it does **not** publish a site or create a public URL.
+
+To get a live page, use **[Deploy to GitHub Pages](.github/workflows/deploy-pages.yml)** (runs on push to `main` / `master`):
+
+1. In the repository: **Settings → Pages → Build and deployment**, set **Source** to **GitHub Actions** (not “Deploy from a branch”).
+2. Push to `main` (or run the workflow manually under **Actions → Deploy to GitHub Pages → Run workflow**).
+3. After the deploy job finishes, open **Settings → Pages** again — the site URL is shown (typically `https://<username>.github.io/<repository>/`).
+
+Optional: add a repository **variable** `NEXT_PUBLIC_API_BASE` (**Settings → Secrets and variables → Actions → Variables**) with the public URL of your FastAPI backend. If unset, the built site still loads, but API calls default to `http://localhost:8000` and will not work for visitors until you set a reachable backend URL.
+
 ## Quick Start
 
 ### 1. Backend
