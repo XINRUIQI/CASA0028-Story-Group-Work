@@ -3,9 +3,9 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [QXR]
   pull_request:
-    branches: [main, master]
+    branches: [QXR]
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
