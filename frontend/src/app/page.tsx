@@ -49,10 +49,16 @@ export default function LandingPage() {
 
   const handleCompare = () => {
     if (!canCompare) return;
+    const originId = origin.lat && origin.lon
+      ? `${origin.lat},${origin.lon}`
+      : origin.naptan_id;
+    const destId = destination.lat && destination.lon
+      ? `${destination.lat},${destination.lon}`
+      : destination.naptan_id;
     const params = new URLSearchParams({
-      origin: origin.naptan_id,
+      origin: originId,
       originName: origin.name,
-      destination: destination.naptan_id,
+      destination: destId,
       destinationName: destination.name,
       times: times.join(","),
       contexts: contexts.join(","),

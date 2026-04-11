@@ -23,6 +23,21 @@ async def _tfl_get(path: str, params: Optional[dict] = None) -> dict:
         params["app_key"] = TFL_API_KEY
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.get(f"{TFL_BASE_URL}{path}", params=params)
+
+        if resp.status_code == 300:
+            body = resp.json()
+            for key in ("fromLocationDisambiguation", "toLocationDisambiguation"):
+                dis = body.get(key, {})
+                options = dis.get("disambiguationOptions", [])
+                if options and dis.get("matchStatus") == "list":
+                    uri = options[0].get("uri", "")
+                    if uri:
+                        retry = await client.get(f"{TFL_BASE_URL}{uri}")
+                        if retry.status_code == 200:
+                            return retry.json()
+
+            raise HTTPException(status_code=300, detail="TfL could not resolve origin/destination uniquely.")
+
         if resp.status_code != 200:
             raise HTTPException(status_code=resp.status_code, detail=resp.text)
         return resp.json()
