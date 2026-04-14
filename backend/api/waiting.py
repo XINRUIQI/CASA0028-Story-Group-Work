@@ -1,117 +1,83 @@
 """
 Waiting burden and service uncertainty computation.
-Data sources: #1 TfL live arrivals + line status, #2 Timetable headway
+Data sources: TfL live arrivals + line status, timetable headway.
 """
 
 import json
-from typing import Optional, Union
-from pathlib import Path
-from fastapi import APIRouter, Query
-import httpx
+from typing import Optional
 
-from backend.core.config import TFL_BASE_URL, TFL_API_KEY
+from fastapi import APIRouter, Query
+
+from backend.core.config import PROCESSED_DIR, time_to_band
+from backend.core.tfl_client import tfl_get
 
 router = APIRouter(prefix="/waiting", tags=["waiting"])
 
-DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "processed"
-
-
-async def _tfl_get(path: str, params: Optional[dict] = None) -> Union[dict, list]:
-    params = params or {}
-    if TFL_API_KEY:
-        params["app_key"] = TFL_API_KEY
-    async with httpx.AsyncClient(timeout=20) as client:
-        resp = await client.get(f"{TFL_BASE_URL}{path}", params=params)
-        if resp.status_code != 200:
-            return []
-        return resp.json()
-
 
 def _load_headway() -> dict:
-    """Load pre-computed headway data from timetable (#2)."""
-    filepath = DATA_DIR / "headway_by_route_time.json"
+    filepath = PROCESSED_DIR / "headway_by_route_time.json"
     if not filepath.exists():
         return {}
     with open(filepath) as f:
         return json.load(f)
 
 
-def _time_to_band(time_str: str) -> str:
-    try:
-        hour = int(time_str.split(":")[0])
-    except (ValueError, IndexError):
-        return "evening"
-    if 7 <= hour < 10:
-        return "am_peak"
-    elif 10 <= hour < 16:
-        return "inter_peak"
-    elif 16 <= hour < 19:
-        return "pm_peak"
-    elif 19 <= hour < 22:
-        return "evening"
-    else:
-        return "late_night"
-
-
 @router.get("/burden")
 async def compute_waiting_burden(
-    naptan_id: str = Query(...),
+    naptan_id: str = Query(""),
     line_id: str = Query(""),
     time: str = Query("21:00"),
 ):
     """
-    Compute waiting burden for a stop:
-    - expected_wait = headway / 2 (random arrival assumption)
-    - schedule_gap_ratio = evening headway / daytime headway
-    - missed_penalty = full headway (next service wait)
+    Waiting burden for a stop/line:
+      expected_wait ≈ headway / 2   (random-arrival assumption)
+      gap_ratio     = target headway / daytime headway
+      missed_penalty = full headway  (next service wait)
     """
-    band = _time_to_band(time)
+    band = time_to_band(time)
     headway_data = _load_headway()
 
     route_key = line_id or naptan_id
     route_headway = headway_data.get(route_key, {})
 
-    daytime_headway = route_headway.get("inter_peak", 5)
-    target_headway = route_headway.get(band, 10)
+    daytime_hw = route_headway.get("inter_peak", 5)
+    target_hw = route_headway.get(band, 10)
 
-    expected_wait = target_headway / 2
-    gap_ratio = round(target_headway / daytime_headway, 2) if daytime_headway > 0 else None
-    missed_penalty = target_headway
+    expected_wait = target_hw / 2
+    gap_ratio = round(target_hw / daytime_hw, 2) if daytime_hw > 0 else None
 
-    if target_headway <= 5:
-        burden_label = "low"
-    elif target_headway <= 10:
-        burden_label = "moderate"
-    elif target_headway <= 20:
-        burden_label = "heavy"
+    if target_hw <= 5:
+        label = "low"
+    elif target_hw <= 10:
+        label = "moderate"
+    elif target_hw <= 20:
+        label = "heavy"
     else:
-        burden_label = "very heavy"
+        label = "very heavy"
 
     return {
         "naptan_id": naptan_id,
         "line_id": line_id,
         "time_band": band,
-        "headway_min": target_headway,
-        "daytime_headway_min": daytime_headway,
+        "headway_min": target_hw,
+        "daytime_headway_min": daytime_hw,
         "expected_wait_min": round(expected_wait, 1),
         "gap_ratio": gap_ratio,
-        "missed_penalty_min": missed_penalty,
-        "burden_label": burden_label,
+        "missed_penalty_min": target_hw,
+        "burden_label": label,
     }
 
 
 @router.get("/line-status")
 async def get_line_status(line_id: str = Query(...)):
-    """
-    Get current line status from TfL (#1).
-    Used for service uncertainty indication.
-    """
-    data = await _tfl_get(f"/Line/{line_id}/Status")
+    """Current line status from TfL (service uncertainty)."""
+    data = await tfl_get(f"/Line/{line_id}/Status", raise_on_error=False)
     if not data:
         return {"line_id": line_id, "statuses": []}
 
     statuses = []
-    for line in data if isinstance(data, list) else [data]:
+    items = data if isinstance(data, list) else [data]
+    for line in items:
         for s in line.get("lineStatuses", []):
             statuses.append({
                 "severity": s.get("statusSeverity"),
@@ -128,7 +94,7 @@ async def compute_service_uncertainty(
     time: str = Query("21:00"),
 ):
     """
-    Infer service uncertainty combining line status + headway gap.
+    Infer service uncertainty from line status + headway gap.
     NOT a true delay probability — an inferred contextual indicator.
     """
     status_data = await get_line_status(line_id)
@@ -159,4 +125,32 @@ async def compute_service_uncertainty(
         "headway_gap_ratio": gap_ratio,
         "explanation": explanation,
         "note": "Inferred from timetables and status feeds, not a true delay probability.",
+    }
+
+
+@router.get("/arrivals")
+async def get_stop_arrivals(
+    naptan_id: str = Query(..., description="NaPTAN ID of the stop"),
+):
+    """Live arrival predictions at a stop — feeds the journey timeline."""
+    data = await tfl_get(
+        f"/StopPoint/{naptan_id}/Arrivals", raise_on_error=False
+    )
+    if not data or not isinstance(data, list):
+        return {"naptan_id": naptan_id, "arrivals": []}
+
+    arrivals = sorted(data, key=lambda a: a.get("timeToStation", 9999))
+    return {
+        "naptan_id": naptan_id,
+        "arrivals": [
+            {
+                "line_id": a.get("lineId", ""),
+                "line_name": a.get("lineName", ""),
+                "destination": a.get("destinationName", ""),
+                "expected_arrival": a.get("expectedArrival", ""),
+                "time_to_station_s": a.get("timeToStation"),
+                "platform": a.get("platformName", ""),
+            }
+            for a in arrivals[:15]
+        ],
     }

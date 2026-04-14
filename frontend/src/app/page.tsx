@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Clock, ShieldCheck, Activity, HelpCircle } from "lucide-react";
+import HeroCover from "@/components/HeroCover";
 import StopPointSearch from "@/components/StopPointSearch";
 import TimeSelector from "@/components/TimeSelector";
 import TagSelector from "@/components/TagSelector";
@@ -49,12 +50,14 @@ export default function LandingPage() {
 
   const handleCompare = () => {
     if (!canCompare) return;
-    const originId = origin.lat && origin.lon
-      ? `${origin.lat},${origin.lon}`
-      : origin.naptan_id;
-    const destId = destination.lat && destination.lon
-      ? `${destination.lat},${destination.lon}`
-      : destination.naptan_id;
+    const originId =
+      origin.lat && origin.lon
+        ? `${origin.lat},${origin.lon}`
+        : origin.naptan_id;
+    const destId =
+      destination.lat && destination.lon
+        ? `${destination.lat},${destination.lon}`
+        : destination.naptan_id;
     const params = new URLSearchParams({
       origin: originId,
       originName: origin.name,
@@ -67,107 +70,110 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-16">
-      {/* Hero */}
-      <section className="text-center mb-16">
-        <h1 className="text-4xl font-bold mb-4 leading-tight">
-          After Dark:{" "}
-          <span style={{ color: "var(--accent-amber)" }}>
-            How the Same Journey Changes
-          </span>
-        </h1>
+    <>
+      {/* ── Page 0: Cinematic cover ──────────────────────────── */}
+      <HeroCover />
+
+      {/* ── Page 1: Problem & needs ──────────────────────────── */}
+      <div className="max-w-4xl mx-auto px-6 py-16">
+        {/* Section intro */}
+        <section className="text-center mb-16">
+          <p
+            className="text-xs uppercase tracking-widest mb-3"
+            style={{ color: "var(--accent-amber)" }}
+          >
+            Same path, different demands
+          </p>
+          <h2 className="text-3xl font-bold mb-4 leading-tight">
+            Plan one journey, compare across time
+          </h2>
+          <p
+            className="text-base max-w-2xl mx-auto"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            Enter a route below. The system will show how the same origin and
+            destination change in waiting, support, activity and uncertainty at
+            different departure times.
+          </p>
+        </section>
+
+        {/* Journey input */}
+        <section className="card mb-8">
+          <h2 className="text-lg font-semibold mb-4">
+            Choose your journey
+          </h2>
+          <div className="grid md:grid-cols-2 gap-4 mb-4">
+            <StopPointSearch
+              label="From"
+              placeholder="Search origin stop or station..."
+              onSelect={setOrigin}
+            />
+            <StopPointSearch
+              label="To"
+              placeholder="Search destination stop or station..."
+              onSelect={setDestination}
+            />
+          </div>
+          <TimeSelector selected={times} onChange={setTimes} />
+        </section>
+
+        {/* Tonight I am... */}
+        <section className="card mb-8">
+          <h2 className="text-lg font-semibold mb-2">Tonight I am...</h2>
+          <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
+            This does not change the city. It changes the lens through which you
+            compare it.
+          </p>
+          <TagSelector
+            options={CONTEXT_OPTIONS}
+            selected={contexts}
+            onChange={setContexts}
+          />
+        </section>
+
+        {/* Compare button */}
+        <div className="text-center mb-16">
+          <button
+            className="btn-primary text-lg px-8 py-3"
+            disabled={!canCompare}
+            onClick={handleCompare}
+          >
+            Compare this journey
+          </button>
+          {!canCompare && (
+            <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>
+              Select origin, destination, and at least two departure times.
+            </p>
+          )}
+        </div>
+
+        {/* What changes after dark */}
+        <section className="mb-12">
+          <h2 className="text-xl font-semibold text-center mb-6">
+            What changes after dark?
+          </h2>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {DIMENSIONS.map((d) => (
+              <DimensionCard key={d.title} {...d} />
+            ))}
+          </div>
+          <p
+            className="text-sm text-center mt-4"
+            style={{ color: "var(--text-muted)" }}
+          >
+            Not all journey costs appear in total travel time.
+          </p>
+        </section>
+
+        {/* Transition footer */}
         <p
-          className="text-lg max-w-2xl mx-auto mb-3"
+          className="text-center text-sm max-w-lg mx-auto"
           style={{ color: "var(--text-secondary)" }}
         >
-          Compare how the same route shifts after dark — in waiting, support,
-          activity, and uncertainty.
+          The same route can feel more fragmented, less supported, and harder to
+          recover from after dark.
         </p>
-        <p
-          className="text-sm max-w-xl mx-auto"
-          style={{ color: "var(--text-muted)" }}
-        >
-          This prototype does not choose for you. It helps you compare
-          trade-offs and decide what matters tonight.
-        </p>
-      </section>
-
-      {/* Journey Input */}
-      <section className="card mb-8">
-        <h2 className="text-lg font-semibold mb-4">
-          Plan one journey across different times
-        </h2>
-        <div className="grid md:grid-cols-2 gap-4 mb-4">
-          <StopPointSearch
-            label="From"
-            placeholder="Search origin stop or station..."
-            onSelect={setOrigin}
-          />
-          <StopPointSearch
-            label="To"
-            placeholder="Search destination stop or station..."
-            onSelect={setDestination}
-          />
-        </div>
-        <TimeSelector selected={times} onChange={setTimes} />
-      </section>
-
-      {/* Tonight I am... */}
-      <section className="card mb-8">
-        <h2 className="text-lg font-semibold mb-2">Tonight I am...</h2>
-        <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
-          This does not change the city. It changes the lens through which you
-          compare it.
-        </p>
-        <TagSelector
-          options={CONTEXT_OPTIONS}
-          selected={contexts}
-          onChange={setContexts}
-        />
-      </section>
-
-      {/* Compare Button */}
-      <div className="text-center mb-16">
-        <button
-          className="btn-primary text-lg px-8 py-3"
-          disabled={!canCompare}
-          onClick={handleCompare}
-        >
-          Compare this journey
-        </button>
-        {!canCompare && (
-          <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>
-            Select origin, destination, and at least two departure times.
-          </p>
-        )}
       </div>
-
-      {/* What changes after dark */}
-      <section className="mb-12">
-        <h2 className="text-xl font-semibold text-center mb-6">
-          What changes after dark?
-        </h2>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {DIMENSIONS.map((d) => (
-            <DimensionCard key={d.title} {...d} />
-          ))}
-        </div>
-        <p
-          className="text-sm text-center mt-4"
-          style={{ color: "var(--text-muted)" }}
-        >
-          Not all journey costs appear in total travel time.
-        </p>
-      </section>
-
-      {/* Transition footer */}
-      <p
-        className="text-center text-sm max-w-lg mx-auto"
-        style={{ color: "var(--text-secondary)" }}
-      >
-        The same route can feel more fragmented, less supported, and harder to
-        recover from after dark.
-      </p>
-    </div>
+    </>
   );
 }

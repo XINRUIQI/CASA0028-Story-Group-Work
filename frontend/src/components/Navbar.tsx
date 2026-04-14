@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Moon } from "lucide-react";
@@ -13,13 +14,24 @@ const NAV_ITEMS = [
 
 export default function Navbar() {
   const pathname = usePathname();
+  const [scrolled, setScrolled] = useState(false);
+  const isHome = pathname === "/";
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 80);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  const showBg = !isHome || scrolled;
 
   return (
     <nav
-      className="sticky top-0 z-50 border-b"
+      className="fixed top-0 left-0 right-0 z-50 border-b transition-all duration-500"
       style={{
-        background: "var(--bg-secondary)",
-        borderColor: "var(--border-subtle)",
+        background: showBg ? "var(--bg-secondary)" : "transparent",
+        borderColor: showBg ? "var(--border-subtle)" : "transparent",
       }}
     >
       <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
