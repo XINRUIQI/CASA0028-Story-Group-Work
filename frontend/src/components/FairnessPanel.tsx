@@ -80,15 +80,16 @@ function dropLabel(drop: number): { text: string; color: string } {
 export default function FairnessPanel() {
   const [activeLayer, setActiveLayer] = useState<LayerId>("waiting_burden_increase");
   const [zones, setZones] = useState<Record<string, FairnessZone>>({});
-  const [loading, setLoading] = useState(true);
+  const [fetchedLayer, setFetchedLayer] = useState<string>("");
+  const loading = activeLayer !== fetchedLayer;
 
   useEffect(() => {
-    setLoading(true);
+    let stale = false;
     api
       .getFairnessLayer(activeLayer)
-      .then((res) => setZones(res.zones || {}))
-      .catch(() => setZones({}))
-      .finally(() => setLoading(false));
+      .then((res) => { if (!stale) { setZones(res.zones || {}); setFetchedLayer(activeLayer); } })
+      .catch(() => { if (!stale) { setZones({}); setFetchedLayer(activeLayer); } });
+    return () => { stale = true; };
   }, [activeLayer]);
 
   const activeDef = LAYERS.find((l) => l.id === activeLayer)!;
@@ -151,12 +152,10 @@ export default function FairnessPanel() {
             <ZoneGroup
               title="Inner London"
               zones={innerZones}
-              activeDef={activeDef}
             />
             <ZoneGroup
               title="Outer London"
               zones={outerZones}
-              activeDef={activeDef}
             />
           </div>
 
@@ -197,11 +196,9 @@ export default function FairnessPanel() {
 function ZoneGroup({
   title,
   zones,
-  activeDef,
 }: {
   title: string;
   zones: [string, FairnessZone][];
-  activeDef: LayerDef;
 }) {
   if (zones.length === 0) return null;
 

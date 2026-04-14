@@ -38,16 +38,19 @@ export default function HourlyCurves({
   highlightMetrics = [],
 }: HourlyCurvesProps) {
   const [curves, setCurves] = useState<Record<string, HourlyPoint | null>>({});
-  const [loading, setLoading] = useState(true);
+  const [fetchedFor, setFetchedFor] = useState<string>("");
+  const loading = !!(origin && destination) && `${origin}|${destination}` !== fetchedFor;
 
   useEffect(() => {
     if (!origin || !destination) return;
-    setLoading(true);
+    let stale = false;
+    const key = `${origin}|${destination}`;
     api
       .compareCards(origin, destination, [
         "18:00", "19:00", "20:00", "21:00", "22:00", "23:00", "00:00",
       ])
       .then((res) => {
+        if (stale) return;
         const pts: Record<string, HourlyPoint | null> = {};
         for (const [t, opt] of Object.entries(res.options)) {
           if (!opt) { pts[t] = null; continue; }
@@ -64,9 +67,10 @@ export default function HourlyCurves({
           };
         }
         setCurves(pts);
+        setFetchedFor(key);
       })
-      .catch(() => setCurves({}))
-      .finally(() => setLoading(false));
+      .catch(() => { if (!stale) { setCurves({}); setFetchedFor(key); } });
+    return () => { stale = true; };
   }, [origin, destination]);
 
   if (loading) {

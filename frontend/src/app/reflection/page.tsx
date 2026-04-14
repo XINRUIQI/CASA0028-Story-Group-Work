@@ -4,7 +4,6 @@ import Link from "next/link";
 import {
   CheckCircle,
   AlertTriangle,
-  Info,
   Clock,
   Database,
   ShieldAlert,
