@@ -246,3 +246,235 @@ body {
   font-size: 0.85rem;
   font-style: italic;
 }
+
+/* ── Page 1: Persona cards ──────────────────────────────────── */
+
+.persona-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  text-align: left;
+  padding: 1.25rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  cursor: pointer;
+  transition: border-color 0.25s, background 0.25s, transform 0.2s;
+  width: 100%;
+}
+.persona-card:hover {
+  transform: translateY(-2px);
+}
+
+.persona-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.25rem;
+}
+
+.persona-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.persona-who {
+  font-size: 0.8rem;
+  color: var(--accent-amber);
+  font-weight: 500;
+}
+
+.persona-situation {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.persona-concerns {
+  list-style: none;
+  padding: 0;
+  margin: 0.25rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.persona-concerns li {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  padding-left: 0.75rem;
+  position: relative;
+}
+.persona-concerns li::before {
+  content: "›";
+  position: absolute;
+  left: 0;
+  color: var(--accent-blue);
+}
+
+/* ── Page 1: Needs list ─────────────────────────────────────── */
+
+.needs-empty {
+  text-align: center;
+  padding: 1.5rem 1rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.needs-list {
+  animation: needs-enter 0.4s ease;
+}
+
+.needs-heading {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--accent-amber);
+  margin-bottom: 0.75rem;
+}
+
+.needs-items {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.need-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  animation: needs-enter 0.35s ease both;
+}
+.need-item:nth-child(2) { animation-delay: 0.05s; }
+.need-item:nth-child(3) { animation-delay: 0.1s; }
+.need-item:nth-child(4) { animation-delay: 0.15s; }
+.need-item:nth-child(5) { animation-delay: 0.2s; }
+.need-item:nth-child(6) { animation-delay: 0.25s; }
+
+.need-icon {
+  color: var(--accent-blue);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.need-text {
+  display: block;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.need-reason {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+  line-height: 1.4;
+}
+
+@keyframes needs-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Page 1: Preset journey cards ───────────────────────────── */
+
+.preset-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+}
+@media (max-width: 640px) {
+  .preset-grid { grid-template-columns: 1fr; }
+}
+
+.preset-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  padding: 1rem 1.15rem;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.2s, background 0.2s, transform 0.2s;
+}
+.preset-card:hover {
+  border-color: var(--accent-blue);
+  background: var(--bg-card-hover);
+  transform: translateY(-1px);
+}
+
+.preset-icon {
+  margin-bottom: 0.15rem;
+}
+
+.preset-label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.preset-desc {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* ── Scroll-reveal animation ────────────────────────────────── */
+
+.reveal-section {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+.reveal-section.revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Stagger children */
+.reveal-section:nth-child(2) { transition-delay: 0.1s; }
+.reveal-section:nth-child(3) { transition-delay: 0.2s; }
+.reveal-section:nth-child(4) { transition-delay: 0.3s; }
+
+/* ── Section label (page headers) ───────────────────────────── */
+
+.section-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--accent-amber);
+  margin-bottom: 0.75rem;
+}
+
+.section-or {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  padding: 0.75rem 0;
+  position: relative;
+}
+.section-or::before,
+.section-or::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: calc(50% - 1.5rem);
+  height: 1px;
+  background: var(--border-subtle);
+}
+.section-or::before { left: 0; }
+.section-or::after { right: 0; }
