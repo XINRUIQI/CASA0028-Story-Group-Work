@@ -7,8 +7,11 @@ import { Moon } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/", label: "Home" },
+  { href: "/overview", label: "Overview" },
   { href: "/compare", label: "Compare" },
   { href: "/unpack", label: "Unpack" },
+  { href: "/fairness", label: "Fairness" },
+  { href: "/choose", label: "Choose" },
   { href: "/reflection", label: "Reflection" },
 ];
 

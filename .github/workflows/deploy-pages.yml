@@ -1,5 +1,5 @@
 # Deploy static frontend to GitHub Pages
-# Triggers automatically on push to QXR branch
+# Triggers after CI workflow succeeds on QXR branch
 #
 # Setup (one-time):
 #   Repo → Settings → Pages → Build and deployment → Source: "GitHub Actions"
@@ -11,7 +11,9 @@
 name: Deploy to GitHub Pages
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches: [QXR]
   workflow_dispatch:
 
@@ -28,6 +30,9 @@ jobs:
   build:
     name: Build static site
     runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
     steps:
       - name: Checkout
         uses: actions/checkout@v4

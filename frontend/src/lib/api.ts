@@ -12,6 +12,8 @@ async function fetchJSON<T>(path: string, params?: Record<string, string>): Prom
   return res.json();
 }
 
+/* ── Types ────────────────────────────────────────────────────── */
+
 export interface StopPointMatch {
   name: string;
   naptan_id: string;
@@ -65,16 +67,23 @@ export interface SupportCard {
   mode?: string;
   lat: number;
   lon: number;
+  time?: string;
   shelter: boolean;
   step_free: string;
   toilet_in_station: boolean;
   lift_disruption: boolean;
+  nearby_shops_total: number;
   nearby_shops_open: number;
-  nearby_pharmacy: number;
+  nearby_pharmacy_total: number;
+  nearby_pharmacy_open: number;
+  nearby_healthcare_total: number;
+  nearby_healthcare_open: number;
   nearby_toilets: number;
   nearby_aed: number;
-  nearby_healthcare: number;
   lamp_density: number;
+  total_support_open: number;
+  total_support_all: number;
+  support_open_ratio: number | null;
 }
 
 export interface WaitingBurden {
@@ -99,6 +108,79 @@ export interface UncertaintyResult {
   note: string;
 }
 
+export interface CardData {
+  card: string;
+  [key: string]: unknown;
+}
+
+export interface CompareCardsResult {
+  origin: string;
+  destination: string;
+  options: Record<string, {
+    journey: Journey;
+    cards: Record<string, CardData>;
+  } | null>;
+  note: string;
+}
+
+export interface MissedConnectionResult {
+  naptan_id: string;
+  line_id: string;
+  time: string;
+  extra_wait_min: number;
+  daytime_extra_wait_min: number;
+  wait_penalty_ratio: number | null;
+  fallback_lines: number;
+  recovery_difficulty: string;
+  explanation: string;
+}
+
+export interface JourneyRecoveryResult {
+  time: string;
+  worst_case: {
+    leg_index: number;
+    stop_name: string;
+    line_id: string;
+    extra_wait_min: number;
+    fallback_lines: number;
+    recovery_difficulty: string;
+  } | null;
+  mean_penalty_min: number;
+  overall_resilience: string;
+  transfers: Array<{
+    leg_index: number;
+    stop_name: string;
+    line_id: string;
+    extra_wait_min: number;
+    fallback_lines: number;
+    recovery_difficulty: string;
+  }>;
+}
+
+export interface FairnessZone {
+  name: string;
+  day_value: number;
+  night_value: number;
+  drop_ratio: number;
+  percentile: number;
+}
+
+export interface FairnessLayerInfo {
+  id: string;
+  available: boolean;
+  zone_count: number;
+}
+
+export interface FairnessSummaryDim {
+  available: boolean;
+  zone_count?: number;
+  mean_drop?: number;
+  max_drop?: number;
+  min_drop?: number;
+}
+
+/* ── API methods ──────────────────────────────────────────────── */
+
 export const api = {
   searchStopPoint(query: string) {
     return fetchJSON<{ matches: StopPointMatch[] }>("/journey/stoppoint/search", { query });
@@ -116,10 +198,18 @@ export const api = {
     });
   },
 
-  getRouteSupport(legs: Leg[]) {
-    return fetchJSON<{ support_cards: SupportCard[] }>("/support/route", {
-      legs_json: JSON.stringify(legs),
+  compareCards(origin: string, destination: string, times: string[]) {
+    return fetchJSON<CompareCardsResult>("/compare/cards", {
+      origin,
+      destination,
+      times: times.join(","),
     });
+  },
+
+  getRouteSupport(legs: Leg[], time?: string) {
+    const params: Record<string, string> = { legs_json: JSON.stringify(legs) };
+    if (time) params.time = time;
+    return fetchJSON<{ support_cards: SupportCard[] }>("/support/route", params);
   },
 
   getWaitingBurden(naptanId: string, lineId: string, time: string) {
@@ -137,17 +227,54 @@ export const api = {
     });
   },
 
+  getJourneyRecovery(legs: Leg[], time: string) {
+    return fetchJSON<JourneyRecoveryResult>("/recovery/journey-recovery", {
+      legs_json: JSON.stringify(legs),
+      time,
+    });
+  },
+
+  getMissedConnection(naptanId: string, lineId: string, time: string, lat: number, lon: number) {
+    return fetchJSON<MissedConnectionResult>("/recovery/missed-connection", {
+      naptan_id: naptanId,
+      line_id: lineId,
+      time,
+      lat: String(lat),
+      lon: String(lon),
+    });
+  },
+
+  getFairnessLayers() {
+    return fetchJSON<{ layers: FairnessLayerInfo[] }>("/fairness/layers");
+  },
+
+  getFairnessLayer(layerId: string) {
+    return fetchJSON<{ layer_id: string; zones: Record<string, FairnessZone> }>(
+      `/fairness/layer/${layerId}`,
+    );
+  },
+
+  getFairnessSummary() {
+    return fetchJSON<{ summary: Record<string, FairnessSummaryDim> }>("/fairness/summary");
+  },
+
+  getFairnessZone(zoneCode: string) {
+    return fetchJSON<{ zone_code: string; profile: Record<string, FairnessZone | null> }>(
+      `/fairness/zone/${zoneCode}`,
+    );
+  },
+
   getCrimeContext(lat: number, lon: number) {
     return fetchJSON<{ total_incidents: number; by_category: Record<string, number>; note: string }>(
       "/exposure/crime-context",
-      { lat: String(lat), lon: String(lon) }
+      { lat: String(lat), lon: String(lon) },
     );
   },
 
   getLighting(lat: number, lon: number) {
     return fetchJSON<{ lamp_count: number; label: string; note: string }>(
       "/exposure/lighting",
-      { lat: String(lat), lon: String(lon) }
+      { lat: String(lat), lon: String(lon) },
     );
   },
 };

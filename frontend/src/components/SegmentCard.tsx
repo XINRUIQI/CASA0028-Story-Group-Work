@@ -82,7 +82,7 @@ export default function SegmentCard({ index, leg, support }: SegmentCardProps) {
           ) : (
             <Badge label="Few open places nearby" variant="amber" />
           )}
-          {support.nearby_pharmacy > 0 && (
+          {support.nearby_pharmacy_open > 0 && (
             <Badge label="Pharmacy nearby" variant="green" />
           )}
           {support.nearby_aed > 0 && (
