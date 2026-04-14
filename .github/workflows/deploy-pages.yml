@@ -1,5 +1,13 @@
-# Deploy static frontend to GitHub Pages (project site URL: https://<user>.github.io/<repo>/)
-# Prerequisite: Repo → Settings → Pages → Build and deployment → Source: GitHub Actions
+# Deploy static frontend to GitHub Pages
+# Triggers automatically on push to QXR branch
+#
+# Setup (one-time):
+#   Repo → Settings → Pages → Build and deployment → Source: "GitHub Actions"
+#
+# Optional:
+#   Repo → Settings → Secrets and variables → Actions → Variables
+#   Add NEXT_PUBLIC_API_BASE = your deployed backend URL (e.g. https://your-api.fly.dev)
+
 name: Deploy to GitHub Pages
 
 on:
@@ -31,18 +39,23 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install and build
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build static export
         working-directory: frontend
         env:
           STATIC_EXPORT: "true"
-          # Must match GitHub project path: https://<user>.github.io/<repository>/
           BASE_PATH: /${{ github.event.repository.name }}
-          # Optional: set in Repo → Settings → Variables and secrets → Actions → Variables
-          # Public URL of your FastAPI backend (browser must reach it; localhost will not work).
           NEXT_PUBLIC_API_BASE: ${{ vars.NEXT_PUBLIC_API_BASE }}
+        run: npm run build
+
+      - name: Verify output
         run: |
-          npm ci
-          npm run build
+          echo "Static files generated:"
+          ls -lh frontend/out/*.html
+          echo "Total size: $(du -sh frontend/out | cut -f1)"
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
@@ -50,7 +63,7 @@ jobs:
           path: frontend/out
 
   deploy:
-    name: Deploy
+    name: Deploy to Pages
     needs: build
     runs-on: ubuntu-latest
     environment:
