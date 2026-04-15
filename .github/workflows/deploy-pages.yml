@@ -104,6 +104,7 @@ jobs:
           STATIC_EXPORT: "true"
           BASE_PATH: /${{ github.event.repository.name }}
           NEXT_PUBLIC_API_BASE: ${{ vars.NEXT_PUBLIC_API_BASE }}
+          NEXT_PUBLIC_MAPBOX_TOKEN: ${{ vars.NEXT_PUBLIC_MAPBOX_TOKEN }}
         run: npm run build
 
       - name: Verify output
