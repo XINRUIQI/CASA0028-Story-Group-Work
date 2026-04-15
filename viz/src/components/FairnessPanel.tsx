@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Timer,
   ShieldCheck,
@@ -163,7 +163,15 @@ export default function FairnessPanel() {
   const zonesRef = useRef<Record<string, FairnessZone>>({});
   const loading = activeLayer !== fetchedLayer;
 
-  zonesRef.current = zones;
+  useEffect(() => { zonesRef.current = zones; }, [zones]);
+
+  const updateChoropleth = useCallback(() => {
+    const m = mapRef.current;
+    if (!m || !readyRef.current || !geoRef.current) return;
+    const src = m.getSource("boroughs") as mapboxgl.GeoJSONSource | undefined;
+    if (!src) return;
+    src.setData(mergeGeoWithZones(geoRef.current, zonesRef.current));
+  }, []);
 
   /* Fetch GeoJSON once */
   useEffect(() => {
@@ -174,8 +182,7 @@ export default function FairnessPanel() {
         updateChoropleth();
       })
       .catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [updateChoropleth]);
 
   /* Fetch layer data */
   useEffect(() => {
@@ -194,19 +201,9 @@ export default function FairnessPanel() {
     return () => { stale = true; };
   }, [activeLayer]);
 
-  /* Update choropleth whenever zones change */
-  function updateChoropleth() {
-    const m = mapRef.current;
-    if (!m || !readyRef.current || !geoRef.current) return;
-    const src = m.getSource("boroughs") as mapboxgl.GeoJSONSource | undefined;
-    if (!src) return;
-    src.setData(mergeGeoWithZones(geoRef.current, zonesRef.current));
-  }
-
   useEffect(() => {
     updateChoropleth();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [zones]);
+  }, [zones, updateChoropleth]);
 
   /* Initialize map (once, no dependency on data) */
   useEffect(() => {
@@ -295,7 +292,7 @@ export default function FairnessPanel() {
         readyRef.current = false;
       }
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   /* Aggregate MSOA zones → borough-level entries for UI display */
   const boroughMap: Record<string, { name: string; day: number; night: number; drop: number; count: number }> = {};

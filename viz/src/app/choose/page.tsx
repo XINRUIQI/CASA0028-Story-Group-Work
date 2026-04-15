@@ -277,21 +277,21 @@ function smoothPath(points: [number, number][]): string {
   return d;
 }
 
+const CHART_W = 720;
+const CHART_H = 260;
+const CHART_PAD = { top: 30, right: 40, bottom: 38, left: 14 } as const;
+const CHART_CW = CHART_W - CHART_PAD.left - CHART_PAD.right;
+const CHART_CH = CHART_H - CHART_PAD.top - CHART_PAD.bottom;
+
 function HourlyLineChart({
   curves,
 }: {
   curves: Record<string, HourlyPoint | null>;
 }) {
   const hours = HOURS.filter((h) => curves[h] !== undefined);
-  if (hours.length === 0) return null;
-
-  const W = 720;
-  const H = 260;
-  const PAD = { top: 30, right: 40, bottom: 38, left: 14 };
-  const cw = W - PAD.left - PAD.right;
-  const ch = H - PAD.top - PAD.bottom;
 
   const normed = useMemo(() => {
+    if (hours.length === 0) return {};
     const result: Record<string, [number, number][]> = {};
     for (const line of CHART_LINES) {
       const vals = hours.map((h) => curves[h]?.[line.key] ?? null);
@@ -301,50 +301,52 @@ function HourlyLineChart({
       const range = max - min || 1;
       result[line.key] = hours.map((h, i) => {
         const v = curves[h]?.[line.key] ?? null;
-        const x = PAD.left + (i / (hours.length - 1)) * cw;
+        const x = CHART_PAD.left + (i / (hours.length - 1)) * CHART_CW;
         const y =
           v !== null
-            ? PAD.top + (1 - (v - min) / range) * ch
-            : PAD.top + ch / 2;
+            ? CHART_PAD.top + (1 - (v - min) / range) * CHART_CH
+            : CHART_PAD.top + CHART_CH / 2;
         return [x, y] as [number, number];
       });
     }
     return result;
-  }, [curves, hours, cw, ch]);
+  }, [curves, hours]);
+
+  if (hours.length === 0) return null;
 
   const annotations = [
     {
-      x: PAD.left + (1 / (hours.length - 1)) * cw,
-      y: PAD.top + 6,
+      x: CHART_PAD.left + (1 / (hours.length - 1)) * CHART_CW,
+      y: CHART_PAD.top + 6,
       text: "Waiting burden increases (High!)",
       anchor: "start" as const,
     },
     {
-      x: PAD.left + (4 / (hours.length - 1)) * cw,
-      y: PAD.top + ch * 0.38,
+      x: CHART_PAD.left + (4 / (hours.length - 1)) * CHART_CW,
+      y: CHART_PAD.top + CHART_CH * 0.38,
       text: "Nearby Support Drops (Mid)",
       anchor: "middle" as const,
     },
     {
-      x: PAD.left + (7 / (hours.length - 1)) * cw,
-      y: PAD.top + 14,
+      x: CHART_PAD.left + (7 / (hours.length - 1)) * CHART_CW,
+      y: CHART_PAD.top + 14,
       text: "Recovery Penalty Increases",
       anchor: "end" as const,
     },
   ];
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="choose-line-svg">
+    <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="choose-line-svg">
       {/* grid lines */}
       {hours.map((_, i) => {
-        const x = PAD.left + (i / (hours.length - 1)) * cw;
+        const x = CHART_PAD.left + (i / (hours.length - 1)) * CHART_CW;
         return (
           <line
             key={i}
             x1={x}
-            y1={PAD.top}
+            y1={CHART_PAD.top}
             x2={x}
-            y2={PAD.top + ch}
+            y2={CHART_PAD.top + CHART_CH}
             stroke="rgba(201,169,110,0.08)"
             strokeWidth="1"
           />
@@ -394,12 +396,12 @@ function HourlyLineChart({
 
       {/* x-axis labels */}
       {hours.map((h, i) => {
-        const x = PAD.left + (i / (hours.length - 1)) * cw;
+        const x = CHART_PAD.left + (i / (hours.length - 1)) * CHART_CW;
         return (
           <text
             key={h}
             x={x}
-            y={H - 8}
+            y={CHART_H - 8}
             textAnchor="middle"
             fill="var(--text-muted)"
             fontSize="11"
@@ -493,13 +495,14 @@ export default function ChoosePage() {
   const [rawCards, setRawCards] = useState<
     Record<string, Record<string, Record<string, unknown>> | null>
   >({});
-  const [loading, setLoading] = useState(false);
+  const [fetchedKey, setFetchedKey] = useState("");
 
   const preset = PRESET_ROUTES[persona];
+  const routeKey = `${preset.origin}|${preset.dest}`;
+  const loading = routeKey !== fetchedKey;
 
   useEffect(() => {
     let stale = false;
-    setLoading(true);
     api
       .compareCards(preset.origin, preset.dest, HOURS)
       .then((res) => {
@@ -529,13 +532,13 @@ export default function ChoosePage() {
         }
         setCurves(pts);
         setRawCards(cards);
-        setLoading(false);
+        setFetchedKey(`${preset.origin}|${preset.dest}`);
       })
       .catch(() => {
         if (!stale) {
           setCurves({});
           setRawCards({});
-          setLoading(false);
+          setFetchedKey(`${preset.origin}|${preset.dest}`);
         }
       });
     return () => {
