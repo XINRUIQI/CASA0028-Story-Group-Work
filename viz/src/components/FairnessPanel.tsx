@@ -14,7 +14,8 @@ import { api, type FairnessZone } from "@/lib/api";
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
 const CENTER: [number, number] = [-0.118, 51.509];
-const GEOJSON_URL = "/london-boroughs.geojson";
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
+const GEOJSON_URL = `${BASE_PATH}/london-boroughs.geojson`;
 
 type LayerId =
   | "waiting_burden_increase"
