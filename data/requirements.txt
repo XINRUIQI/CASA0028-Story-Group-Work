@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+httpx
+pandas
+geopandas
+shapely
+python-dotenv
+numpy
+requests

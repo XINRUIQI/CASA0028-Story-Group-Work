@@ -7,15 +7,14 @@ A decision-support prototype for CASA0028, exploring how public transport journe
 ## Project Structure
 
 ```
-├── frontend/              Next.js + Tailwind CSS + Mapbox GL JS
+├── viz/                   Next.js + Tailwind CSS + Mapbox GL JS
 │   ├── src/app/           4 pages: Landing / Compare / Unpack / Reflection
 │   ├── src/components/    Reusable UI components
 │   └── src/lib/           API client + shared types
-├── backend/               Python FastAPI
+├── data/
 │   ├── api/               5 route modules: journey / support / activity / exposure / waiting
 │   ├── core/              Config and shared utilities
-│   └── main.py            FastAPI app entry point
-├── data/
+│   ├── main.py            FastAPI app entry point
 │   ├── raw/               Raw downloaded datasets (git-ignored)
 │   ├── processed/         Cleaned GeoJSON / JSON files
 │   └── scripts/           ETL pipeline scripts
@@ -27,7 +26,7 @@ A decision-support prototype for CASA0028, exploring how public transport journe
 On every push and pull request to `main` or `master`, [CI](.github/workflows/ci.yml) runs:
 
 - **Frontend:** `npm ci`, `npm run lint`, `npm run build` (Node 20)
-- **Backend:** install `backend/requirements.txt`, import `backend.main`, `compileall`
+- **Backend:** install `data/requirements.txt`, import `data.main`, `compileall`
 
 No secrets are required for CI. After pushing this workflow to GitHub, open the repository’s **Actions** tab to see runs.
 
@@ -48,7 +47,7 @@ Optional: add a repository **variable** `NEXT_PUBLIC_API_BASE` (**Settings → S
 ### 1. Backend
 
 ```bash
-cd backend
+cd data
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -57,10 +56,10 @@ pip install -r requirements.txt
 cp .env.example .env
 
 # Run the API server
-uvicorn backend.main:app --reload --port 8000
+uvicorn data.main:app --reload --port 8000
 ```
 
-> Run `uvicorn` from the project root, not from inside `backend/`.
+> Run `uvicorn` from the project root, not from inside `data/`.
 
 ### 2. Data ETL (run once)
 
@@ -82,7 +81,7 @@ python 04_aed_healthcare.py
 ### 3. Frontend
 
 ```bash
-cd frontend
+cd viz
 cp .env.local.example .env.local
 npm install
 npm run dev

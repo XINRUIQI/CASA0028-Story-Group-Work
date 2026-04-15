@@ -1,13 +1,13 @@
 # CI + Deploy
-# Runs lint & backend checks on every push / PR to QXR.
-# On push (not PR), also builds and deploys static frontend to GitHub Pages.
+# Runs lint & data API checks on every push / PR to QXR.
+# On push (not PR), also builds and deploys static viz to GitHub Pages.
 #
 # Setup (one-time):
 #   Repo → Settings → Pages → Build and deployment → Source: "GitHub Actions"
 #
 # Optional:
 #   Repo → Settings → Secrets and variables → Actions → Variables
-#   Add NEXT_PUBLIC_API_BASE = your deployed backend URL (e.g. https://your-api.fly.dev)
+#   Add NEXT_PUBLIC_API_BASE = your deployed API URL (e.g. https://your-api.fly.dev)
 
 name: CI / Deploy
 
@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: frontend
+        working-directory: viz
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,7 +44,7 @@ jobs:
         with:
           node-version: "20"
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: viz/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -64,18 +64,18 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-          cache-dependency-path: backend/requirements.txt
+          cache-dependency-path: data/requirements.txt
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r backend/requirements.txt
+          pip install -r data/requirements.txt
 
       - name: Verify imports
-        run: python -c "from backend.main import app; print('OK:', app.title)"
+        run: python -c "from data.main import app; print('OK:', app.title)"
 
       - name: Compile backend package
-        run: python -m compileall -q backend
+        run: python -m compileall -q data
 
   # ── Build & Deploy (only on push / manual, after CI passes) ──
   build:
@@ -92,14 +92,14 @@ jobs:
         with:
           node-version: "20"
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: viz/package-lock.json
 
       - name: Install dependencies
-        working-directory: frontend
+        working-directory: viz
         run: npm ci
 
       - name: Build static export
-        working-directory: frontend
+        working-directory: viz
         env:
           STATIC_EXPORT: "true"
           BASE_PATH: /${{ github.event.repository.name }}
@@ -109,13 +109,13 @@ jobs:
       - name: Verify output
         run: |
           echo "Static files generated:"
-          ls -lh frontend/out/*.html
-          echo "Total size: $(du -sh frontend/out | cut -f1)"
+          ls -lh viz/out/*.html
+          echo "Total size: $(du -sh viz/out | cut -f1)"
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: frontend/out
+          path: viz/out
 
   deploy:
     name: Deploy to Pages
