@@ -52,8 +52,8 @@ export default function Navbar() {
                 href={item.href}
                 className="px-3 py-1.5 rounded-md text-sm font-medium transition-colors"
                 style={{
-                  color: active ? "var(--accent-blue)" : "var(--text-secondary)",
-                  background: active ? "rgba(91,141,239,0.1)" : "transparent",
+                  color: active ? "var(--champagne-gold)" : "var(--text-secondary)",
+                  background: active ? "rgba(201,169,110,0.1)" : "transparent",
                 }}
               >
                 {item.label}

@@ -93,7 +93,7 @@ def generate_placeholder_fairness():
         "fairness_support.json": _make_layer(15, 4, 8, 1),
         "fairness_recovery.json": _make_layer(6, 2, 4, 1),
         "fairness_activity.json": _make_layer(0.8, 0.3, 0.5, 0.1),
-        "fairness_lighting.json": _make_layer(0.75, 0.75, 0.45, 0.45),
+        "fairness_lighting.json": _make_layer(0.75, 0.35, 0.45, 0.12),
     }
 
     for filename, data in layers.items():

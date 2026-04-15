@@ -38,9 +38,9 @@ function decodePolyline(encoded: string): [number, number][] {
 }
 
 function legColor(leg: Leg): string {
-  if (leg.is_walking) return "#f0a945";
-  if (leg.mode_id === "bus") return "#34d399";
-  return "#5b8def";
+  if (leg.is_walking) return "#d4b77d";
+  if (leg.mode_id === "bus") return "#b8a472";
+  return "#c9a96e";
 }
 
 interface RouteMapProps {
@@ -53,7 +53,7 @@ interface RouteMapProps {
 export default function RouteMap({
   legs,
   label,
-  accent = "var(--accent-blue)",
+  accent = "var(--champagne-gold)",
   supportCount,
 }: RouteMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -132,7 +132,7 @@ export default function RouteMap({
         if (arr.lat != null && arr.lon != null) {
           const el = document.createElement("div");
           el.className = "route-map-marker";
-          el.style.background = "#f472b6";
+          el.style.background = "#d4946a";
           new mapboxgl.Marker({ element: el, anchor: "center" })
             .setLngLat([arr.lon, arr.lat])
             .addTo(map);

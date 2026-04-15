@@ -1,6 +1,6 @@
 "use client";
 
-const PRESET_TIMES = ["18:00", "21:00", "23:00", "01:00"];
+const PRESET_TIMES = ["18:00", "21:00", "23:00"];
 
 interface TimeSelectorProps {
   selected: string[];
@@ -32,11 +32,11 @@ export default function TimeSelector({ selected, onChange }: TimeSelectorProps) 
             className="px-4 py-2 rounded-lg text-sm font-medium transition-all"
             style={{
               background: selected.includes(time)
-                ? "rgba(91,141,239,0.2)"
+                ? "rgba(201,169,110,0.2)"
                 : "var(--bg-secondary)",
-              border: `1px solid ${selected.includes(time) ? "var(--accent-blue)" : "var(--border-subtle)"}`,
+              border: `1px solid ${selected.includes(time) ? "var(--champagne-gold)" : "var(--border-subtle)"}`,
               color: selected.includes(time)
-                ? "var(--accent-blue)"
+                ? "var(--champagne-gold)"
                 : "var(--text-secondary)",
             }}
           >

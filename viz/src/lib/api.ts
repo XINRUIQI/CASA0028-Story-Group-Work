@@ -5,7 +5,7 @@ async function fetchJSON<T>(path: string, params?: Record<string, string>): Prom
   if (params) {
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   }
-  const res = await fetch(url.toString());
+  const res = await fetch(url.toString(), { signal: AbortSignal.timeout(120_000) });
   if (!res.ok) {
     throw new Error(`API error ${res.status}: ${res.statusText}`);
   }

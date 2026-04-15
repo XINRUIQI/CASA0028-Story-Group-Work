@@ -1,8 +1,33 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Search } from "lucide-react";
+import { Search, MapPin } from "lucide-react";
 import { api, StopPointMatch } from "@/lib/api";
+
+const UK_POSTCODE_RE =
+  /^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i;
+
+async function geocodePostcode(
+  postcode: string
+): Promise<StopPointMatch | null> {
+  try {
+    const clean = postcode.replace(/\s+/g, "").toUpperCase();
+    const res = await fetch(`https://api.postcodes.io/postcodes/${clean}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.status !== 200 || !data.result) return null;
+    const r = data.result;
+    return {
+      name: `${r.postcode} — ${r.admin_ward}, ${r.admin_district}`,
+      naptan_id: "",
+      lat: r.latitude,
+      lon: r.longitude,
+      modes: ["postcode"],
+    };
+  } catch {
+    return null;
+  }
+}
 
 interface StopPointSearchProps {
   label: string;
@@ -49,9 +74,18 @@ export default function StopPointSearch({
     debounceRef.current = setTimeout(async () => {
       setLoading(true);
       try {
+        const results: StopPointMatch[] = [];
+
+        if (UK_POSTCODE_RE.test(val.trim())) {
+          const pc = await geocodePostcode(val.trim());
+          if (pc) results.push(pc);
+        }
+
         const res = await api.searchStopPoint(val);
-        setMatches(res.matches);
-        setOpen(true);
+        results.push(...res.matches);
+
+        setMatches(results);
+        setOpen(results.length > 0);
       } catch (err) {
         console.error("[StopPointSearch] fetch failed:", err);
         setMatches([]);
@@ -100,9 +134,9 @@ export default function StopPointSearch({
             borderColor: "var(--border-subtle)",
           }}
         >
-          {matches.map((m) => (
+          {matches.map((m, i) => (
             <li
-              key={m.naptan_id}
+              key={m.naptan_id || `pc-${i}`}
               className="px-3 py-2.5 cursor-pointer transition-colors text-sm"
               style={{ borderBottom: "1px solid var(--border-subtle)" }}
               onClick={() => {
@@ -117,7 +151,12 @@ export default function StopPointSearch({
                 (e.currentTarget.style.background = "transparent")
               }
             >
-              <div style={{ color: "var(--text-primary)" }}>{m.name}</div>
+              <div className="flex items-center gap-1.5">
+                {m.modes.includes("postcode") && (
+                  <MapPin size={14} style={{ color: "var(--accent-amber)" }} />
+                )}
+                <span style={{ color: "var(--text-primary)" }}>{m.name}</span>
+              </div>
               <div
                 className="text-xs mt-0.5"
                 style={{ color: "var(--text-muted)" }}

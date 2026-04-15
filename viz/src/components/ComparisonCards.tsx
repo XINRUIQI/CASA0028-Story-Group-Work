@@ -30,7 +30,7 @@ const CARD_DEFS: CardDef[] = [
     key: "functional_cost",
     title: "Functional cost",
     icon: <Clock size={18} />,
-    accent: "var(--accent-blue)",
+    accent: "var(--champagne-gold)",
     render: (c) => ({
       primary: `${c.total_duration_min ?? "—"} min · ${c.transfers ?? 0} transfers`,
       secondary: `${c.walk_min ?? 0} min walk · ${Math.round(Number(c.walk_distance_m) || 0)} m`,
@@ -91,7 +91,7 @@ const CARD_DEFS: CardDef[] = [
     key: "lighting_proxy",
     title: "Lighting proxy",
     icon: <Lightbulb size={18} />,
-    accent: "var(--accent-blue)",
+    accent: "var(--champagne-gold)",
     render: (c) => ({
       primary: `${c.mean_lamps_per_walk ?? "—"} lamps per walk segment`,
       secondary: String(c.label ?? ""),

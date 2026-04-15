@@ -29,7 +29,7 @@ const METRICS: {
   { key: "waiting_burden", label: "Expected wait", unit: "min", color: "var(--accent-rose)", higherIsWorse: true },
   { key: "support_open", label: "Open support POIs", unit: "", color: "var(--accent-emerald)", higherIsWorse: false },
   { key: "max_recovery_penalty_min", label: "Max missed-connection penalty", unit: "min", color: "var(--accent-amber)", higherIsWorse: true },
-  { key: "duration_min", label: "Total journey time", unit: "min", color: "var(--accent-blue)", higherIsWorse: true },
+  { key: "duration_min", label: "Total journey time", unit: "min", color: "var(--champagne-gold)", higherIsWorse: true },
 ];
 
 export default function HourlyCurves({

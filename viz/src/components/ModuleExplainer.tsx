@@ -29,7 +29,7 @@ const MODULES: Module[] = [
   {
     id: "functional",
     icon: <Route size={22} />,
-    accent: "var(--accent-blue)",
+    accent: "var(--champagne-gold)",
     title: "Functional Travel",
     subtitle: "Duration, walking, transfers, fare",
     shows:
@@ -89,7 +89,7 @@ const MODULES: Module[] = [
   {
     id: "lighting",
     icon: <Lightbulb size={22} />,
-    accent: "var(--accent-blue)",
+    accent: "var(--champagne-gold)",
     title: "Lighting Proxy",
     subtitle: "Street lamp density, lit road share",
     shows:
@@ -132,7 +132,7 @@ function Illustration({ module: mod, isActive }: { module: Module; isActive: boo
         </div>
         <span className="scrolly-dn-arrow">→</span>
         <div className="scrolly-dn-mini night">
-          <span className="scrolly-dn-dot" style={{ background: "var(--accent-blue)" }} />
+          <span className="scrolly-dn-dot" style={{ background: "var(--champagne-gold)" }} />
           <span>Night</span>
         </div>
       </div>

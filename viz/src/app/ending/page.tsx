@@ -1,117 +1,104 @@
 "use client";
 
-import Link from "next/link";
-import { Moon, ExternalLink, Mail } from "lucide-react";
-import { useReveal } from "@/lib/useReveal";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function EndingPage() {
-  const revealRef = useReveal();
+  const router = useRouter();
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setVisible(true), 400);
+    return () => clearTimeout(t);
+  }, []);
 
   return (
-    <div ref={revealRef} className="ending-page">
-      <div className="ending-inner">
-        {/* ── Icon ── */}
-        <div className="reveal-section ending-icon-wrap">
-          <Moon size={48} style={{ color: "var(--accent-amber)" }} />
+    <section className="final-page">
+      {/* Subtle silver-gray London road network */}
+      <div className="final-map-bg" />
+
+      {/* Central glow orb */}
+      <div className="final-glow-orb" />
+
+      <div className={`final-content ${visible ? "final-visible" : ""}`}>
+        {/* Main quote */}
+        <blockquote className="final-quote">
+          &ldquo;The goal is not to declare the city safe or unsafe&nbsp;&mdash;
+          <br />
+          but to show how support, waiting, and recovery
+          <br />
+          change after dark, and why that matters.&rdquo;
+        </blockquote>
+
+        {/* Closing line */}
+        <p className="final-thanks">Thank you for exploring.</p>
+
+        {/* Credits */}
+        <div className="final-credits">
+          <div className="final-credit-group">
+            <span className="final-credit-label">Project</span>
+            <span className="final-credit-value">After Dark: How the Same Journey Changes</span>
+          </div>
+          <div className="final-credit-divider" />
+          <div className="final-credit-group">
+            <span className="final-credit-label">Team</span>
+            <span className="final-credit-value">Xinrui Qi &middot; Shirly</span>
+          </div>
+          <div className="final-credit-divider" />
+          <div className="final-credit-group">
+            <span className="final-credit-label">Course</span>
+            <span className="final-credit-value">CASA0028 &mdash; Story Group Work &middot; UCL CASA &middot; 2026</span>
+          </div>
         </div>
 
-        {/* ── Wish ── */}
-        <section className="reveal-section text-center mb-10">
-          <h1 className="ending-title">
-            Build a city where the same journey
-            <br />
-            <span style={{ color: "var(--accent-amber)" }}>
-              feels the same — day or night
+        <div className="final-credits">
+          <div className="final-credit-group">
+            <span className="final-credit-label">Data Sources</span>
+            <span className="final-credit-value">
+              TfL Unified API &middot; OpenStreetMap &middot; NHS APIs &middot; BHF The Circuit &middot; GLA London Datastore &middot; NASA Black Marble &middot; data.police.uk &middot; NaPTAN (DfT)
             </span>
-          </h1>
-        </section>
-
-        {/* ── Closing statement ── */}
-        <section className="reveal-section text-center mb-14">
-          <p className="ending-body">
-            This prototype does not solve urban safety. It makes hidden
-            trade-offs visible — so that travellers, planners, and researchers
-            can ask better questions about what changes after dark.
-          </p>
-        </section>
-
-        {/* ── Thank you ── */}
-        <section className="reveal-section text-center mb-12">
-          <p className="ending-thanks">Thank you for exploring.</p>
-        </section>
-
-        {/* ── Credits ── */}
-        <section className="reveal-section mb-14">
-          <div className="ending-credits">
-            <h3 className="ending-credits-title">Project</h3>
-            <p className="ending-credits-name">
-              After Dark: How the Same Journey Changes
-            </p>
-            <p className="ending-credits-meta">
-              CASA0028 — Story Group Work · UCL CASA · 2026
-            </p>
-
-            <h3 className="ending-credits-title" style={{ marginTop: "1.25rem" }}>
-              Team
-            </h3>
-            <div className="ending-team">
-              <TeamMember name="Xinrui Qi" />
-              <TeamMember name="Shirly" />
-            </div>
-
-            <h3 className="ending-credits-title" style={{ marginTop: "1.25rem" }}>
-              Data sources
-            </h3>
-            <p className="ending-credits-meta">
-              TfL Unified API · OpenStreetMap · NHS APIs · BHF The Circuit ·
-              GLA London Datastore · NASA Black Marble · data.police.uk ·
-              NaPTAN (DfT)
-            </p>
-
-            <h3 className="ending-credits-title" style={{ marginTop: "1.25rem" }}>
-              Built with
-            </h3>
-            <p className="ending-credits-meta">
-              Next.js · FastAPI · Tailwind CSS · Mapbox · Lucide Icons
-            </p>
           </div>
-        </section>
-
-        {/* ── Links ── */}
-        <section className="reveal-section text-center mb-10">
-          <div className="flex gap-4 justify-center flex-wrap">
-            <a
-              href="https://github.com/XINRUIQI/CASA0028-Story-Group-Work"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="ending-link"
-            >
-              <ExternalLink size={16} />
-              <span>Source code</span>
-            </a>
-            <a
-              href="mailto:ucfnxqi@ucl.ac.uk"
-              className="ending-link"
-            >
-              <Mail size={16} />
-              <span>Contact</span>
-            </a>
+          <div className="final-credit-divider" />
+          <div className="final-credit-group">
+            <span className="final-credit-label">Built With</span>
+            <span className="final-credit-value">Next.js &middot; FastAPI &middot; Tailwind CSS &middot; Mapbox &middot; Lucide Icons</span>
           </div>
-        </section>
+        </div>
 
-        {/* ── Back to start ── */}
-        <section className="reveal-section text-center">
-          <Link href="/" className="btn-primary px-8 py-3 text-lg">
-            Back to start
-          </Link>
-        </section>
+        {/* Links */}
+        <div className="final-links">
+          <a
+            href="https://github.com/XINRUIQI/CASA0028-Story-Group-Work"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="final-link"
+          >
+            Source Code
+          </a>
+          <span className="final-link-dot">&middot;</span>
+          <a href="mailto:ucfnxqi@ucl.ac.uk" className="final-link">
+            Contact
+          </a>
+        </div>
+
+        {/* Back to Top pill button */}
+        <button onClick={() => router.push("/")} className="final-back-btn" type="button">
+          &uarr;&ensp;Back to Start
+        </button>
       </div>
-    </div>
-  );
-}
 
-function TeamMember({ name }: { name: string }) {
-  return (
-    <span className="ending-team-member">{name}</span>
+      {/* Sparkle decoration */}
+      <div className="final-sparkle" aria-hidden="true">
+        <svg
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path d="M12 0L13.8 10.2L24 12L13.8 13.8L12 24L10.2 13.8L0 12L10.2 10.2L12 0Z" />
+        </svg>
+      </div>
+    </section>
   );
 }

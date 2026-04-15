@@ -13,7 +13,7 @@ interface JourneyTimelineProps {
 function segmentColor(leg: Leg): string {
   if (leg.is_walking) return "var(--accent-amber)";
   if (leg.mode_id === "bus") return "var(--accent-emerald)";
-  return "var(--accent-blue)";
+  return "var(--champagne-gold)";
 }
 
 function segmentIcon(leg: Leg) {
@@ -26,7 +26,7 @@ export default function JourneyTimeline({
   legs,
   totalDuration,
   label,
-  accent = "var(--accent-blue)",
+  accent = "var(--champagne-gold)",
 }: JourneyTimelineProps) {
   if (!legs.length) return null;
 

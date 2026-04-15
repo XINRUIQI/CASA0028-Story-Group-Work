@@ -49,18 +49,23 @@ const TIME_LABELS: Record<string, string> = {
 };
 
 const TIME_COLORS = [
-  "var(--accent-blue)",
+  "var(--champagne-gold)",
   "var(--accent-amber)",
   "var(--accent-rose)",
   "var(--accent-emerald)",
 ];
 
+const DEFAULT_ORIGIN = "940GZZLUESQ";
+const DEFAULT_ORIGIN_NAME = "Euston Square";
+const DEFAULT_DEST = "HUBSVS";
+const DEFAULT_DEST_NAME = "Seven Sisters";
+
 function CompareContent() {
   const searchParams = useSearchParams();
-  const origin = searchParams.get("origin") || "";
-  const originName = searchParams.get("originName") || origin;
-  const destination = searchParams.get("destination") || "";
-  const destinationName = searchParams.get("destinationName") || destination;
+  const origin = searchParams.get("origin") || DEFAULT_ORIGIN;
+  const originName = searchParams.get("originName") || (searchParams.get("origin") ? searchParams.get("origin")! : DEFAULT_ORIGIN_NAME);
+  const destination = searchParams.get("destination") || DEFAULT_DEST;
+  const destinationName = searchParams.get("destinationName") || (searchParams.get("destination") ? searchParams.get("destination")! : DEFAULT_DEST_NAME);
   const timesParam = searchParams.get("times") || "18:00,21:00,23:30";
   const contextsParam = searchParams.get("contexts") || "";
 
@@ -136,9 +141,9 @@ function CompareContent() {
           <h2 className="text-sm font-semibold">Your journey tonight</h2>
         </div>
         <p className="text-lg font-medium mb-3">
-          <span style={{ color: "var(--accent-blue)" }}>{originName}</span>
+          <span style={{ color: "var(--champagne-gold)" }}>{originName}</span>
           {" → "}
-          <span style={{ color: "var(--accent-blue)" }}>{destinationName}</span>
+          <span style={{ color: "var(--champagne-gold)" }}>{destinationName}</span>
         </p>
         {contexts.length > 0 && (
           <div className="flex items-center gap-2 flex-wrap mb-3">

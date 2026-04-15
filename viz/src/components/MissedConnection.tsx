@@ -41,7 +41,7 @@ export default function MissedConnection({ legs, time }: MissedConnectionProps) 
 
   const difficultyColor: Record<string, string> = {
     easy: "var(--accent-emerald)",
-    manageable: "var(--accent-blue)",
+    manageable: "var(--champagne-gold)",
     difficult: "var(--accent-amber)",
     "very difficult": "var(--accent-rose)",
   };
@@ -88,7 +88,7 @@ export default function MissedConnection({ legs, time }: MissedConnectionProps) 
             </div>
           </div>
           <div className="missed-stat">
-            <Route size={16} style={{ color: "var(--accent-blue)" }} />
+            <Route size={16} style={{ color: "var(--champagne-gold)" }} />
             <div>
               <span className="missed-stat-value">
                 {result.fallback_lines} lines

@@ -19,16 +19,18 @@ function seeded(i: number): number {
 
 interface ServiceGridProps {
   band: TimeBand;
+  activeColor?: string;
 }
 
-export default function ServiceGrid({ band }: ServiceGridProps) {
+export default function ServiceGrid({ band, activeColor }: ServiceGridProps) {
   const activeRatio = band === "daytime" ? 1 : band === "evening" ? 0.7 : 0.3;
   const dotColor =
-    band === "daytime"
+    activeColor ??
+    (band === "daytime"
       ? "var(--accent-amber)"
       : band === "evening"
-        ? "var(--accent-blue)"
-        : "var(--accent-blue)";
+        ? "var(--champagne-gold)"
+        : "var(--champagne-gold)");
 
   return (
     <div className="service-grid-wrap">

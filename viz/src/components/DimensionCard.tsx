@@ -11,7 +11,7 @@ export default function DimensionCard({ icon, title, description }: DimensionCar
     <div className="card flex flex-col items-start gap-3">
       <div
         className="w-10 h-10 rounded-lg flex items-center justify-center"
-        style={{ background: "rgba(91,141,239,0.12)" }}
+        style={{ background: "rgba(201,169,110,0.12)" }}
       >
         {icon}
       </div>

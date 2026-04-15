@@ -12,10 +12,10 @@ import { useReveal } from "@/lib/useReveal";
 import type { StopPointMatch } from "@/lib/api";
 
 const PRESET_ROUTES: Record<PersonaId, { origin: string; dest: string; oName: string; dName: string }> = {
-  student:     { origin: "940GZZLUESQ", dest: "940GZZLUSEV", oName: "Euston Square", dName: "Seven Sisters" },
+  student:     { origin: "940GZZLUESQ", dest: "HUBSVS", oName: "Euston Square", dName: "Seven Sisters" },
   budget:      { origin: "940GZZLUSTD", dest: "940GZZLUBXN", oName: "Stratford", dName: "Brixton" },
   nightworker: { origin: "940GZZLUKSX", dest: "940GZZLUBKG", oName: "King's Cross", dName: "Barking" },
-  unfamiliar:  { origin: "940GZZLUPAC", dest: "940GZZLUGR",  oName: "Paddington", dName: "Greenwich" },
+  unfamiliar:  { origin: "940GZZLUPAC", dest: "HUBGNW",  oName: "Paddington", dName: "Greenwich" },
 };
 
 export default function ChoosePage() {
@@ -89,9 +89,9 @@ export default function ChoosePage() {
           </div>
         ) : (
           <p className="text-lg font-medium">
-            <span style={{ color: "var(--accent-blue)" }}>{originName}</span>
+            <span style={{ color: "var(--champagne-gold)" }}>{originName}</span>
             {" → "}
-            <span style={{ color: "var(--accent-blue)" }}>{destName}</span>
+            <span style={{ color: "var(--champagne-gold)" }}>{destName}</span>
           </p>
         )}
       </section>

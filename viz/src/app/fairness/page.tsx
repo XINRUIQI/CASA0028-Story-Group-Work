@@ -54,7 +54,7 @@ export default function FairnessPage() {
             </p>
           </div>
           <div className="card">
-            <h3 className="text-sm font-semibold mb-2" style={{ color: "var(--accent-blue)" }}>
+            <h3 className="text-sm font-semibold mb-2" style={{ color: "var(--champagne-gold)" }}>
               Inner London retains more
             </h3>
             <p className="text-sm" style={{ color: "var(--text-secondary)" }}>

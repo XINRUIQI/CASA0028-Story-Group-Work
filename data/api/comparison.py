@@ -14,6 +14,7 @@ Cards:
   6. Lighting proxy      – lit-road share, lamp density
 """
 
+import asyncio
 import json
 from typing import Optional
 
@@ -266,35 +267,41 @@ async def get_comparison_cards(
     headway_data = _load_headway()
     results = {}
 
-    for t in time_list:
-        params = {**_ROUTE_PARAMS_BASE, "time": _to_tfl_time(t)}
-        if date:
-            params["date"] = date
-        data = await tfl_get(
-            f"/Journey/JourneyResults/{origin}/to/{destination}", params
-        )
-        journeys_raw = data.get("journeys", [])
-        if not journeys_raw:
+    for idx, t in enumerate(time_list):
+        if idx > 0:
+            await asyncio.sleep(0.6)
+
+        try:
+            params = {**_ROUTE_PARAMS_BASE, "time": _to_tfl_time(t)}
+            if date:
+                params["date"] = date
+            data = await tfl_get(
+                f"/Journey/JourneyResults/{origin}/to/{destination}", params
+            )
+            journeys_raw = data.get("journeys", [])
+            if not journeys_raw:
+                results[t] = None
+                continue
+
+            journey = _parse_journey(journeys_raw[0])
+
+            cards = {
+                "functional_cost": _functional_cost(journey),
+                "waiting_burden": _waiting_burden(journey, headway_data, t),
+                "service_uncertainty": await _service_uncertainty(
+                    journey, headway_data, t
+                ),
+                "support_access": _support_access(journey, t),
+                "activity_context": _activity_context(journey, t),
+                "lighting_proxy": _lighting_proxy(journey),
+            }
+
+            results[t] = {
+                "journey": journey,
+                "cards": cards,
+            }
+        except Exception:
             results[t] = None
-            continue
-
-        journey = _parse_journey(journeys_raw[0])
-
-        cards = {
-            "functional_cost": _functional_cost(journey),
-            "waiting_burden": _waiting_burden(journey, headway_data, t),
-            "service_uncertainty": await _service_uncertainty(
-                journey, headway_data, t
-            ),
-            "support_access": _support_access(journey, t),
-            "activity_context": _activity_context(journey, t),
-            "lighting_proxy": _lighting_proxy(journey),
-        }
-
-        results[t] = {
-            "journey": journey,
-            "cards": cards,
-        }
 
     return {
         "origin": origin,

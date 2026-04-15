@@ -68,7 +68,7 @@ export default function StatCard({
       {isNight && dayValue !== nightValue && (
         <div
           className="stat-change"
-          style={{ color: isWorse ? "var(--accent-rose)" : "var(--accent-emerald)" }}
+          style={{ color: isWorse ? "var(--accent-rose)" : "var(--champagne-gold)" }}
         >
           {changeStr} vs daytime
         </div>

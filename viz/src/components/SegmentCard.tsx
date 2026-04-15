@@ -25,9 +25,9 @@ function getSegmentIcon(leg: Leg) {
 
 function Badge({ label, variant }: { label: string; variant: "green" | "amber" | "red" | "gray" }) {
   const colors = {
-    green: { bg: "rgba(52,211,153,0.12)", color: "var(--accent-emerald)" },
-    amber: { bg: "rgba(240,169,69,0.12)", color: "var(--accent-amber)" },
-    red: { bg: "rgba(244,114,182,0.12)", color: "var(--accent-rose)" },
+    green: { bg: "rgba(184,164,114,0.12)", color: "var(--accent-emerald)" },
+    amber: { bg: "rgba(212,183,125,0.12)", color: "var(--accent-amber)" },
+    red: { bg: "rgba(212,148,106,0.12)", color: "var(--accent-rose)" },
     gray: { bg: "var(--bg-secondary)", color: "var(--text-muted)" },
   };
   const c = colors[variant];
@@ -47,7 +47,7 @@ export default function SegmentCard({ index, leg, support }: SegmentCardProps) {
       <div className="flex items-center gap-3 mb-3">
         <div
           className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
-          style={{ background: "rgba(91,141,239,0.15)", color: "var(--accent-blue)" }}
+          style={{ background: "rgba(201,169,110,0.15)", color: "var(--champagne-gold)" }}
         >
           {index + 1}
         </div>

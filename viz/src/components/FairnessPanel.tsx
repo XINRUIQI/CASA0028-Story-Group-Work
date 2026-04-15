@@ -47,7 +47,7 @@ const LAYERS: LayerDef[] = [
     id: "recovery_difficulty_increase",
     label: "Recovery difficulty",
     icon: <Route size={16} />,
-    accent: "var(--accent-blue)",
+    accent: "var(--champagne-gold)",
     unit: "fallback routes",
     description: "How much harder it becomes to recover from a missed connection.",
   },
@@ -63,7 +63,7 @@ const LAYERS: LayerDef[] = [
     id: "low_light_walking_burden",
     label: "Low-light walking",
     icon: <Lightbulb size={16} />,
-    accent: "var(--accent-blue)",
+    accent: "var(--champagne-gold)",
     unit: "lit share",
     description: "Night walking burden in areas with less lighting infrastructure.",
   },
@@ -73,7 +73,7 @@ function dropLabel(drop: number): { text: string; color: string } {
   const abs = Math.abs(drop);
   if (abs >= 0.7) return { text: "Severe drop", color: "var(--accent-rose)" };
   if (abs >= 0.4) return { text: "Significant drop", color: "var(--accent-amber)" };
-  if (abs >= 0.15) return { text: "Moderate drop", color: "var(--accent-blue)" };
+  if (abs >= 0.15) return { text: "Moderate drop", color: "var(--champagne-gold)" };
   return { text: "Minimal change", color: "var(--accent-emerald)" };
 }
 

@@ -3,6 +3,8 @@ TfL Journey Planner integration.
 Data sources: TfL Unified API — journey planning, arrivals, status.
 """
 
+import asyncio
+
 from fastapi import APIRouter, Query
 
 from data.core.tfl_client import tfl_get
@@ -117,15 +119,23 @@ async def compare_journey(
     time_list = [t.strip() for t in times.split(",")]
     results = {}
 
-    for t in time_list:
-        params = {**_ROUTE_PARAMS_BASE, "time": _to_tfl_time(t)}
-        if date:
-            params["date"] = date
-        data = await tfl_get(
-            f"/Journey/JourneyResults/{origin}/to/{destination}", params
-        )
-        journeys = [_parse_journey(j) for j in data.get("journeys", [])]
-        results[t] = journeys[0] if journeys else None
+    for idx, t in enumerate(time_list):
+        if idx > 0:
+            await asyncio.sleep(0.6)
+        try:
+            params = {**_ROUTE_PARAMS_BASE, "time": _to_tfl_time(t)}
+            if date:
+                params["date"] = date
+            data = await tfl_get(
+                f"/Journey/JourneyResults/{origin}/to/{destination}",
+                params,
+                raise_on_error=False,
+            )
+            journeys_raw = data.get("journeys", []) if isinstance(data, dict) else []
+            journeys = [_parse_journey(j) for j in journeys_raw]
+            results[t] = journeys[0] if journeys else None
+        except Exception:
+            results[t] = None
 
     return {"origin": origin, "destination": destination, "options": results}
 

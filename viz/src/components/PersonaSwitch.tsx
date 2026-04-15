@@ -19,7 +19,7 @@ export const PERSONA_DEFS: PersonaDef[] = [
     id: "student",
     icon: <GraduationCap size={16} />,
     label: "Late-night student",
-    accent: "var(--accent-blue)",
+    accent: "var(--champagne-gold)",
     focusDimensions: ["waiting_burden", "activity_context"],
     insight: "Waiting alone matters most. Activity and 'someone around' feeling are key.",
   },

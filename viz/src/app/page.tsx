@@ -2,115 +2,150 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Clock,
-  ShieldCheck,
-  Activity,
-  HelpCircle,
-  GraduationCap,
-  Coins,
-  Briefcase,
-  MapPinOff,
-} from "lucide-react";
+import { Clock, ShieldCheck, Activity, HelpCircle } from "lucide-react";
 import HeroCover from "@/components/HeroCover";
-import PersonaCard from "@/components/PersonaCard";
-import type { Persona } from "@/components/PersonaCard";
-import NeedsList from "@/components/NeedsList";
 import PresetJourneys from "@/components/PresetJourneys";
 import StopPointSearch from "@/components/StopPointSearch";
 import TimeSelector from "@/components/TimeSelector";
-import TagSelector from "@/components/TagSelector";
 import DimensionCard from "@/components/DimensionCard";
 import { useReveal } from "@/lib/useReveal";
-import { CONTEXT_LABELS, type ContextTag } from "@/lib/types";
+import type { ContextTag } from "@/lib/types";
 import type { StopPointMatch } from "@/lib/api";
 
-/* ── Persona data ────────────────────────────────────────────── */
+/* ── Page 1: Context checkboxes ──────────────────────────────── */
 
-const PERSONAS: Persona[] = [
-  {
-    id: "student",
-    icon: <GraduationCap size={18} style={{ color: "var(--accent-blue)" }} />,
-    title: "Late-night student",
-    who: "Returning from the library after 10 pm",
-    situation:
-      "The Tube might still run, but the walk home from the station is long and quiet.",
-    concerns: [
-      "Waiting alone at empty platforms",
-      "Few people around during the walk",
-    ],
-    accentColor: "#5b8def",
-  },
-  {
-    id: "budget",
-    icon: <Coins size={18} style={{ color: "var(--accent-amber)" }} />,
-    title: "Budget traveller",
-    who: "Relying on public transport to save money",
-    situation:
-      "A missed bus may mean an expensive taxi. Fare penalties grow after dark.",
-    concerns: [
-      "Missed-connection cost is high",
-      "Fewer fallback options late at night",
-    ],
-    accentColor: "#f0a945",
-  },
-  {
-    id: "nightworker",
-    icon: <Briefcase size={18} style={{ color: "var(--accent-emerald)" }} />,
-    title: "Night-shift worker",
-    who: "Finishing work after midnight",
-    situation:
-      "Regular routes shut down. Night buses run, but infrequently and with longer walks.",
-    concerns: [
-      "Service reliability after last Tube",
-      "Long gaps between night buses",
-    ],
-    accentColor: "#34d399",
-  },
-  {
-    id: "unfamiliar",
-    icon: <MapPinOff size={18} style={{ color: "var(--accent-rose)" }} />,
-    title: "Unfamiliar traveller",
-    who: "First time using this route at night",
-    situation:
-      "Transfers are confusing in the dark. A wrong stop could mean a very different journey.",
-    concerns: [
-      "Complex interchanges after dark",
-      "Hard to recover from mistakes",
-    ],
-    accentColor: "#f472b6",
-  },
+const CONTEXT_CHECKS: { value: ContextTag; label: string }[] = [
+  { value: "travelling-alone", label: "Travelling alone" },
+  { value: "returning-late", label: "Returning late" },
+  { value: "carrying-bags", label: "Carrying bags" },
+  { value: "unfamiliar-area", label: "Unfamiliar with the area" },
 ];
 
-/* ── Context & dimension data ────────────────────────────────── */
+const CONTEXT_NEEDS: Record<ContextTag, string[]> = {
+  "travelling-alone": [
+    "Open shops or staffed places along walking routes (support nearby)",
+    "Routes where other people are likely to be around",
+    "Well-lit paths between stops",
+  ],
+  "returning-late": [
+    "Less time waiting at stops (sensitivity to uncertainty)",
+    "High fault tolerance — backup options if a bus is missed",
+    "Reliable late-night service with shorter gaps",
+  ],
+  "carrying-bags": [
+    "Shorter walking segments between stops",
+    "Fewer interchanges and level changes",
+    "Shelter and seating at waiting points",
+  ],
+  "unfamiliar-area": [
+    "Simple, easy-to-follow routes with fewer transfers",
+    "Well-signed interchanges and clear wayfinding",
+    "Lower cost of mistakes — easier to recover from a wrong stop",
+  ],
+  commuting: [
+    "Predictable journey time with consistent service",
+    "Good recovery options if service is disrupted",
+  ],
+  "student-budget": [
+    "Avoid costly missed connections",
+    "Access to support facilities along the route",
+  ],
+};
 
-const CONTEXT_OPTIONS = Object.entries(CONTEXT_LABELS).map(([value, label]) => ({
-  value: value as ContextTag,
-  label,
-}));
+/* ── Dimension cards data ────────────────────────────────────── */
 
 const DIMENSIONS = [
   {
-    icon: <Clock size={20} style={{ color: "var(--accent-blue)" }} />,
+    icon: <Clock size={20} style={{ color: "var(--champagne-gold)" }} />,
     title: "Waiting",
-    description: "How long you may wait, and what happens if you miss a connection.",
+    description:
+      "How long you may wait, and what happens if you miss a connection.",
   },
   {
-    icon: <ShieldCheck size={20} style={{ color: "var(--accent-emerald)" }} />,
+    icon: <ShieldCheck size={20} style={{ color: "var(--champagne-gold)" }} />,
     title: "Support nearby",
-    description: "Shelters, open shops, pharmacies, and other facilities along the route.",
+    description:
+      "Shelters, open shops, pharmacies, and other facilities along the route.",
   },
   {
-    icon: <Activity size={20} style={{ color: "var(--accent-amber)" }} />,
+    icon: <Activity size={20} style={{ color: "var(--champagne-gold)" }} />,
     title: "Activity around stops",
-    description: "Whether the surroundings are busy or quiet at different times.",
+    description:
+      "Whether the surroundings are busy or quiet at different times.",
   },
   {
-    icon: <HelpCircle size={20} style={{ color: "var(--accent-rose)" }} />,
+    icon: <HelpCircle size={20} style={{ color: "var(--champagne-gold)" }} />,
     title: "Service uncertainty",
-    description: "How predictable the service is, and whether disruptions are reported.",
+    description:
+      "How predictable the service is, and whether disruptions are reported.",
   },
 ];
+
+/* ── Silhouette SVG ──────────────────────────────────────────── */
+
+function Silhouette({ glow }: { glow: string }) {
+  return (
+    <svg
+      viewBox="0 0 200 480"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className="ctx-silhouette-svg"
+    >
+      <defs>
+        <radialGradient id="silGlow" cx="50%" cy="35%" r="55%">
+          <stop offset="0%" stopColor={glow} stopOpacity="0.18" />
+          <stop offset="70%" stopColor={glow} stopOpacity="0.04" />
+          <stop offset="100%" stopColor={glow} stopOpacity="0" />
+        </radialGradient>
+        <linearGradient id="silBody" x1="100" y1="20" x2="100" y2="470" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor={glow} stopOpacity="0.5" />
+          <stop offset="40%" stopColor={glow} stopOpacity="0.25" />
+          <stop offset="100%" stopColor={glow} stopOpacity="0.06" />
+        </linearGradient>
+      </defs>
+      <ellipse cx="100" cy="200" rx="95" ry="170" fill="url(#silGlow)" />
+      {/* Head */}
+      <ellipse cx="100" cy="52" rx="22" ry="26" fill="url(#silBody)" />
+      {/* Neck */}
+      <rect x="93" y="78" width="14" height="14" rx="3" fill="url(#silBody)" />
+      {/* Torso */}
+      <path
+        d="M68 92 C68 88 78 85 100 85 C122 85 132 88 132 92 L136 200 C136 206 132 210 126 210 L74 210 C68 210 64 206 64 200 Z"
+        fill="url(#silBody)"
+      />
+      {/* Left arm */}
+      <path
+        d="M68 96 L48 150 L44 190 C43 196 46 198 50 196 L56 180 L62 150 L68 120"
+        stroke="url(#silBody)"
+        strokeWidth="14"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      {/* Right arm */}
+      <path
+        d="M132 96 L152 150 L156 190 C157 196 154 198 150 196 L144 180 L138 150 L132 120"
+        stroke="url(#silBody)"
+        strokeWidth="14"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      {/* Left leg */}
+      <path
+        d="M82 208 L76 320 L72 400 C71 412 74 420 80 420 L90 420 C94 420 96 416 95 410 L92 320 L90 240"
+        fill="url(#silBody)"
+      />
+      {/* Right leg */}
+      <path
+        d="M118 208 L124 320 L128 400 C129 412 126 420 120 420 L110 420 C106 420 104 416 105 410 L108 320 L110 240"
+        fill="url(#silBody)"
+      />
+      {/* Ground shadow */}
+      <ellipse cx="100" cy="430" rx="60" ry="8" fill={glow} opacity="0.08" />
+    </svg>
+  );
+}
 
 /* ── Page component ──────────────────────────────────────────── */
 
@@ -118,13 +153,43 @@ export default function LandingPage() {
   const router = useRouter();
   const revealRef = useReveal();
 
-  const [selectedPersona, setSelectedPersona] = useState<string | null>(null);
   const [origin, setOrigin] = useState<StopPointMatch | null>(null);
   const [destination, setDestination] = useState<StopPointMatch | null>(null);
   const [times, setTimes] = useState<string[]>(["18:00", "21:00", "22:30"]);
   const [contexts, setContexts] = useState<ContextTag[]>([]);
 
   const canCompare = origin && destination && times.length >= 2;
+
+  const toggleContext = (ctx: ContextTag) => {
+    setContexts((prev) =>
+      prev.includes(ctx) ? prev.filter((c) => c !== ctx) : [...prev, ctx],
+    );
+  };
+
+  const allNeeds: string[] = [];
+  const seen = new Set<string>();
+  for (const ctx of contexts) {
+    for (const need of CONTEXT_NEEDS[ctx] ?? []) {
+      if (!seen.has(need)) {
+        seen.add(need);
+        allNeeds.push(need);
+      }
+    }
+  }
+
+  const CONTEXT_COLORS: Record<ContextTag, string> = {
+    "travelling-alone": "#c9a96e",
+    "returning-late": "#d4b77d",
+    "carrying-bags": "#b8a472",
+    "unfamiliar-area": "#d4946a",
+    commuting: "#a8894f",
+    "student-budget": "#b8a472",
+  };
+
+  const glowColor =
+    contexts.length === 0
+      ? "#c9a96e"
+      : CONTEXT_COLORS[contexts[contexts.length - 1]] ?? "#c9a96e";
 
   const handleCompare = () => {
     if (!canCompare) return;
@@ -152,66 +217,89 @@ export default function LandingPage() {
       {/* ═══════════════ Page 0: Cinematic cover ═══════════════ */}
       <HeroCover />
 
-      {/* ═══════════════ Page 1: Problem & needs ═══════════════ */}
+      {/* ═══════════════ Page 1: Context selection ═══════════════ */}
+      <section className="ctx-page">
+        {/* Map-like background lines */}
+        <div className="ctx-map-bg" />
+
+        <div className="ctx-inner">
+          {/* Left: silhouette */}
+          <div className="ctx-silhouette">
+            <Silhouette glow={glowColor} />
+          </div>
+
+          {/* Right: cards */}
+          <div className="ctx-cards">
+            {/* Tonight I am... */}
+            <div className="ctx-card">
+              <h2 className="ctx-card-title">
+                Tonight I am...{" "}
+                <span className="ctx-card-hint">
+                  (Please select your context)
+                </span>
+              </h2>
+              <div className="ctx-checks">
+                {CONTEXT_CHECKS.map((opt) => {
+                  const active = contexts.includes(opt.value);
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      className="ctx-check-row"
+                      onClick={() => toggleContext(opt.value)}
+                    >
+                      <span
+                        className={`ctx-checkbox ${active ? "checked" : ""}`}
+                      >
+                        {active && (
+                          <svg width="12" height="12" viewBox="0 0 12 12">
+                            <path
+                              d="M2.5 6L5 8.5L9.5 3.5"
+                              stroke="currentColor"
+                              strokeWidth="1.8"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              fill="none"
+                            />
+                          </svg>
+                        )}
+                      </span>
+                      <span className="ctx-check-label">{opt.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* So, I need... */}
+            <div
+              className={`ctx-card ctx-needs-card ${allNeeds.length > 0 ? "has-needs" : ""}`}
+            >
+              <h2 className="ctx-card-title">
+                So, I need...{" "}
+                <span className="ctx-card-hint">
+                  (System dynamically populates based on selection)
+                </span>
+              </h2>
+              {allNeeds.length === 0 ? (
+                <p className="ctx-needs-empty">
+                  Select one or more situations above to see what matters most.
+                </p>
+              ) : (
+                <ul className="ctx-needs-list">
+                  {allNeeds.map((need) => (
+                    <li key={need}>{need}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════════ Below: Journey selection ═══════════════ */}
       <div ref={revealRef} className="max-w-5xl mx-auto px-6 py-20">
-        {/* ── 1A: Who travels after dark ── */}
-        <section className="reveal-section text-center mb-16">
-          <p className="section-label">Who travels after dark?</p>
-          <h2 className="text-3xl font-bold mb-3 leading-tight">
-            The same journey asks different things of different people
-          </h2>
-          <p
-            className="text-base max-w-2xl mx-auto"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            A late-night student worries about waiting alone. A budget traveller
-            worries about missing the last bus. Their routes may overlap — but
-            their burdens do not.
-          </p>
-        </section>
-
-        {/* ── 1B: Persona cards ── */}
-        <section className="reveal-section mb-16">
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {PERSONAS.map((p) => (
-              <PersonaCard
-                key={p.id}
-                persona={p}
-                selected={selectedPersona === p.id}
-                onSelect={setSelectedPersona}
-              />
-            ))}
-          </div>
-        </section>
-
-        {/* ── 1C: Tonight I am... + I need... ── */}
-        <section className="reveal-section mb-12">
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* Left: Tonight I am... */}
-            <div className="card">
-              <h2 className="text-lg font-semibold mb-2">Tonight I am...</h2>
-              <p
-                className="text-xs mb-3"
-                style={{ color: "var(--text-muted)" }}
-              >
-                This does not change the data. It changes the lens through which
-                you read it.
-              </p>
-              <TagSelector
-                options={CONTEXT_OPTIONS}
-                selected={contexts}
-                onChange={setContexts}
-              />
-            </div>
-
-            {/* Right: I need... */}
-            <div className="card">
-              <NeedsList selectedContexts={contexts} />
-            </div>
-          </div>
-        </section>
-
-        {/* ── 1D: Try a preset journey ── */}
+        {/* ── Preset journeys ── */}
         <section className="reveal-section mb-6">
           <p className="section-label">Try a preset journey</p>
           <p
@@ -227,11 +315,9 @@ export default function LandingPage() {
         {/* ── OR divider ── */}
         <div className="section-or reveal-section">or enter your own</div>
 
-        {/* ── 1E: Custom journey input ── */}
+        {/* ── Custom journey input ── */}
         <section className="reveal-section card mb-8">
-          <h2 className="text-lg font-semibold mb-4">
-            Plan your own journey
-          </h2>
+          <h2 className="text-lg font-semibold mb-4">Plan your own journey</h2>
           <div className="grid md:grid-cols-2 gap-4 mb-4">
             <StopPointSearch
               label="From"
@@ -263,7 +349,7 @@ export default function LandingPage() {
           )}
         </div>
 
-        {/* ── 1F: What changes after dark (transition to Page 2) ── */}
+        {/* ── What changes after dark ── */}
         <section className="reveal-section mb-12">
           <h2 className="text-xl font-semibold text-center mb-6">
             What changes after dark?
@@ -281,7 +367,6 @@ export default function LandingPage() {
           </p>
         </section>
 
-        {/* ── Page transition ── */}
         <p
           className="reveal-section text-center text-sm max-w-lg mx-auto"
           style={{ color: "var(--text-secondary)" }}

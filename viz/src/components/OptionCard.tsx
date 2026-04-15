@@ -110,10 +110,10 @@ export default function OptionCard({
             className="flex items-center gap-2 px-3 py-2 rounded-lg"
             style={{
               background: highlighted.includes(m.key)
-                ? "rgba(91,141,239,0.1)"
+                ? "rgba(201,169,110,0.1)"
                 : "var(--bg-secondary)",
               border: highlighted.includes(m.key)
-                ? "1px solid var(--accent-blue)"
+                ? "1px solid var(--champagne-gold)"
                 : "1px solid transparent",
             }}
           >
