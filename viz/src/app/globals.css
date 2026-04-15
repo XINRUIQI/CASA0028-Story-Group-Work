@@ -1825,11 +1825,11 @@ body {
   width: 200px;
   border-radius: 4px;
   background: linear-gradient(to right,
-    rgb(40,80,180),
-    rgb(100,80,150),
-    rgb(160,70,110),
-    rgb(210,60,70),
-    rgb(235,55,40)
+    rgb(50,48,60),
+    rgb(90,78,72),
+    rgb(130,110,85),
+    rgb(170,145,98),
+    rgb(201,169,110)
   );
 }
 .fairness-legend-labels {
@@ -1905,6 +1905,19 @@ body {
 .fairness-sm-svg {
   width: 100%;
   max-height: 180px;
+}
+
+/* Ethical disclaimer */
+.fairness-disclaimer {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 1rem 1.5rem;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+  text-align: center;
+  font-style: italic;
+  border-top: 1px solid var(--border-subtle);
 }
 
 /* Sidebar description */

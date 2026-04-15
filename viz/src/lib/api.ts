@@ -1,15 +1,40 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
+const STATIC_PREFIX = process.env.NEXT_PUBLIC_BASE_PATH || "";
+
+/**
+ * Build a deterministic file path for a pre-fetched static JSON response.
+ * Must stay in sync with data/scripts/prefetch_static.py → static_key().
+ */
+function staticKey(path: string, params?: Record<string, string>): string | null {
+  const dir = path.replace(/^\//, "").replace(/\//g, "-");
+  if (!params || Object.keys(params).length === 0) return `${dir}.json`;
+  if (Object.values(params).some((v) => v.length > 200)) return null;
+  const vals = Object.entries(params)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, v]) => v.replace(/:/g, "-").replace(/,/g, "_"))
+    .join("__");
+  return `${dir}/${vals}.json`;
+}
 
 async function fetchJSON<T>(path: string, params?: Record<string, string>): Promise<T> {
   const url = new URL(path, API_BASE);
   if (params) {
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   }
-  const res = await fetch(url.toString(), { signal: AbortSignal.timeout(120_000) });
-  if (!res.ok) {
-    throw new Error(`API error ${res.status}: ${res.statusText}`);
+  try {
+    const res = await fetch(url.toString(), { signal: AbortSignal.timeout(10_000) });
+    if (!res.ok) throw new Error(`API error ${res.status}: ${res.statusText}`);
+    return res.json();
+  } catch (liveErr) {
+    const key = staticKey(path, params);
+    if (key) {
+      try {
+        const fallback = await fetch(`${STATIC_PREFIX}/static-data/${key}`);
+        if (fallback.ok) return fallback.json();
+      } catch { /* static fallback unavailable */ }
+    }
+    throw liveErr;
   }
-  return res.json();
 }
 
 /* ── Types ────────────────────────────────────────────────────── */

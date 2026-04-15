@@ -83,17 +83,17 @@ const INNER_BOROUGHS = new Set([
 
 function dropColor(ratio: number): string {
   const t = Math.min(Math.max(Math.abs(ratio), 0), 0.8) / 0.8;
-  const r = Math.round(40 + t * 195);
-  const g = Math.round(80 + (1 - t) * 40 - t * 40);
-  const b = Math.round(180 - t * 140);
+  const r = Math.round(50 + t * 151);
+  const g = Math.round(48 + t * 121);
+  const b = Math.round(60 + t * 50);
   return `rgb(${r},${g},${b})`;
 }
 
 function dropLabel(drop: number): { text: string; color: string } {
   const abs = Math.abs(drop);
-  if (abs >= 0.7) return { text: "Severe drop", color: "var(--accent-rose)" };
-  if (abs >= 0.4) return { text: "Significant drop", color: "var(--accent-amber)" };
-  if (abs >= 0.15) return { text: "Moderate drop", color: "var(--champagne-gold)" };
+  if (abs >= 0.7) return { text: "Large gap", color: "var(--accent-amber)" };
+  if (abs >= 0.4) return { text: "Notable gap", color: "var(--champagne-gold)" };
+  if (abs >= 0.15) return { text: "Moderate gap", color: "var(--text-secondary)" };
   return { text: "Minimal change", color: "var(--accent-emerald)" };
 }
 
@@ -139,6 +139,8 @@ function mergeGeoWithZones(
         properties: {
           ...f.properties,
           drop_ratio: agg ? Math.abs(agg.drop) : 0,
+          day_value: agg ? agg.day : 0,
+          night_value: agg ? agg.night : 0,
           fill_color: agg ? dropColor(agg.drop) : "rgba(40,50,90,0.5)",
         },
       };
@@ -267,9 +269,14 @@ export default function FairnessPanel() {
         const props = e.features?.[0]?.properties;
         if (props) {
           const drop = (props.drop_ratio * 100).toFixed(0);
+          const night = Number(props.night_value).toFixed(1);
+          const day = Number(props.day_value).toFixed(1);
           popup
             .setLngLat(e.lngLat)
-            .setHTML(`<strong>${props.name}</strong><br/>Drop: ${drop}%`)
+            .setHTML(
+              `<strong>${props.name}</strong><br/>` +
+              `Gap: ${drop}% &middot; Day: ${day} &middot; Night: ${night}`
+            )
             .addTo(m);
         }
       });
@@ -328,8 +335,8 @@ export default function FairnessPanel() {
       <div className="fairness-hero">
         <p className="section-label">City-wide Fairness &middot; Mobility Support Inequality</p>
         <h1 className="fairness-hero-title">
-          Who Loses Mobility Support{" "}
-          <span style={{ color: "var(--accent-amber)" }}>After Dark?</span>
+          Where Does the Day-to-Night Gap{" "}
+          <span style={{ color: "var(--accent-amber)" }}>Widen Most?</span>
         </h1>
         <p className="fairness-hero-sub">
           Which areas are more likely to lose high-support public transport
@@ -384,7 +391,7 @@ export default function FairnessPanel() {
 
           <div className="fairness-legend">
             <span className="fairness-legend-title">
-              Support Drop [0% &rarr; 80%]
+              Day-to-Night Gap [0% &rarr; 80%]
             </span>
             <div className="fairness-legend-bar" />
             <div className="fairness-legend-labels">
@@ -401,6 +408,13 @@ export default function FairnessPanel() {
           )}
         </div>
       </div>
+
+      {/* ── Ethical disclaimer ── */}
+      <p className="fairness-disclaimer">
+        This map does not indicate safety or danger. It highlights where the gap
+        between daytime and night-time public transport support is largest —
+        areas that may benefit most from targeted service investment.
+      </p>
 
       {/* ── Bottom: Small Multiples ── */}
       {!loading && sortedZones.length > 0 && (
@@ -429,7 +443,7 @@ export default function FairnessPanel() {
           </div>
 
           <div className="fairness-rank">
-            <h4 className="fairness-rank-title">All areas ranked by night-vs-day drop</h4>
+            <h4 className="fairness-rank-title">Day-to-night change by area</h4>
             <div className="fairness-bars">
               {sortedZones.slice(0, 15).map(([code, zone]) => {
                 const abs = Math.abs(zone.drop_ratio);
@@ -480,12 +494,12 @@ function ZoneGroup({
       <div className="fairness-group-stats">
         <div className="fairness-group-stat">
           <span className="fairness-group-val">{avgDay.toFixed(1)}</span>
-          <span className="fairness-group-lbl">Day avg</span>
+          <span className="fairness-group-lbl">Day baseline</span>
         </div>
         <span className="fairness-group-arrow">&rarr;</span>
         <div className="fairness-group-stat">
           <span className="fairness-group-val">{avgNight.toFixed(1)}</span>
-          <span className="fairness-group-lbl">Night avg</span>
+          <span className="fairness-group-lbl">Night value</span>
         </div>
         <div className="fairness-group-stat">
           <span className="fairness-group-val" style={{ color: dl.color }}>
