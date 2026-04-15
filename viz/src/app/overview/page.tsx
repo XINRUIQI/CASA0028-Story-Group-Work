@@ -146,7 +146,7 @@ export default function OverviewPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const readyRef = useRef(false);
-  const geoJSON = useMemo(buildSupportGeoJSON, []);
+  const geoJSON = useMemo(() => buildSupportGeoJSON(), []);
   const revealRef = useReveal();
 
   const d = DATA[band];
