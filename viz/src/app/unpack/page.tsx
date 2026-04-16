@@ -121,8 +121,14 @@ function UnpackContent() {
         </div>
       )}
       {error && (
-        <div className="text-center py-12" style={{ color: "var(--accent-rose)" }}>
-          {error}
+        <div className="text-center py-12">
+          <p style={{ color: "var(--accent-rose)" }} className="mb-3">{error}</p>
+          <p className="text-sm mb-4" style={{ color: "var(--text-muted)" }}>
+            Custom routes require a live backend. On the static site, only preset routes are available.
+          </p>
+          <Link href="/" className="btn-secondary px-5 py-2 text-sm">
+            ← Back to preset journeys
+          </Link>
         </div>
       )}
 

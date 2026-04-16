@@ -318,6 +318,10 @@ export default function LandingPage() {
         {/* ── Custom journey input ── */}
         <section className="reveal-section card mb-8">
           <h2 className="text-lg font-semibold mb-4">Plan your own journey</h2>
+          <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
+            On the static site, only common London stations are searchable.
+            For full search, run the backend locally.
+          </p>
           <div className="grid md:grid-cols-2 gap-4 mb-4">
             <StopPointSearch
               label="From"
