@@ -13,9 +13,9 @@ name: CI / Deploy
 
 on:
   push:
-    branches: [QXR]
+    branches: [test2]
   pull_request:
-    branches: [QXR]
+    branches: [test2]
   workflow_dispatch:
 
 permissions:
