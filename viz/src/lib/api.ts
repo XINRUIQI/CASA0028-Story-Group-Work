@@ -152,6 +152,23 @@ export interface CompareCardsResult {
   note: string;
 }
 
+export interface CompareHourlyResult {
+  origin: string;
+  destination: string;
+  curves: Record<string, {
+    duration_min: number;
+    waiting_burden: number;
+    wait_share: number;
+    support_open: number;
+    support_ratio: number | null;
+    uncertainty_score_pct: number | null;
+    mean_headway_gap_ratio: number | null;
+    safety_score_pct: number | null;
+    safety_exposure_pct: number | null;
+    max_recovery_penalty_min: number;
+  } | null>;
+}
+
 export interface MissedConnectionResult {
   naptan_id: string;
   line_id: string;
@@ -233,6 +250,14 @@ export const api = {
       destination,
       times: times.join(","),
     }, 40_000);
+  },
+
+  compareHourly(origin: string, destination: string, times: string[]) {
+    return fetchJSON<CompareHourlyResult>("/compare/hourly", {
+      origin,
+      destination,
+      times: times.join(","),
+    }, 60_000);
   },
 
   getRouteSupport(legs: Leg[], time?: string) {

@@ -2129,7 +2129,7 @@ body {
   text-transform: capitalize;
 }
 
-/* ── Page 6: Hourly Curves bar chart (legacy, kept for other pages) ── */
+/* ── Hourly Curves ───────────────────────────────────────────── */
 
 .hourly-curves {
   display: flex;
@@ -2137,16 +2137,25 @@ body {
   gap: 1.25rem;
 }
 
-.hourly-row {
+.hourly-curve-row {
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: 12px;
   padding: 1rem 1.25rem;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
-.hourly-row.highlighted {
-  border-color: var(--accent-blue);
+.hourly-curve-row.highlighted {
+  border-color: var(--champagne-gold);
   box-shadow: 0 0 0 1px rgba(201,169,110,0.15);
+}
+
+.hourly-curve-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .hourly-label {
@@ -2166,56 +2175,51 @@ body {
   flex-shrink: 0;
 }
 
-.hourly-bars {
+.hourly-curve-range {
   display: flex;
-  gap: 0.35rem;
-  align-items: flex-end;
-  height: 100px;
-}
-
-.hourly-bar-cell {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 0.2rem;
-  height: 100%;
-}
-
-.hourly-bar-time {
-  font-size: 0.6rem;
+  gap: 0.4rem;
+  font-size: 0.72rem;
   color: var(--text-muted);
-  order: 3;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
-.hourly-bar-track {
-  flex: 1;
+.hourly-curve-scroll {
+  overflow-x: auto;
+  padding-bottom: 0.2rem;
+}
+
+.hourly-curve-svg {
   width: 100%;
-  max-width: 32px;
-  background: var(--bg-secondary);
-  border-radius: 4px;
-  display: flex;
-  align-items: flex-end;
-  overflow: hidden;
-  order: 2;
+  min-width: 720px;
+  height: auto;
+  display: block;
 }
 
-.hourly-bar-fill {
-  width: 100%;
-  border-radius: 4px;
-  transition: height 0.6s ease;
-  min-height: 2px;
-}
-.hourly-bar-fill.empty {
-  background: var(--border-subtle);
-  height: 2px;
+.hourly-curve-axis-label {
+  fill: var(--text-muted);
+  font-size: 10px;
 }
 
-.hourly-bar-val {
-  font-size: 0.6rem;
-  color: var(--text-muted);
+.hourly-curve-point-label {
+  fill: var(--text-secondary);
+  font-size: 10px;
   font-weight: 500;
-  order: 1;
+}
+
+@media (max-width: 720px) {
+  .hourly-curve-row {
+    padding: 0.9rem 0.95rem;
+  }
+
+  .hourly-curve-svg {
+    min-width: 640px;
+  }
+
+  .hourly-curve-range {
+    font-size: 0.68rem;
+  }
 }
 
 /* ── Page 6: Choose — Full-viewport redesign ────────────────── */

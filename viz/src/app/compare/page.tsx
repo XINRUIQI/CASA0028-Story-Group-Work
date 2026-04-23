@@ -9,6 +9,7 @@ import ComparisonCards from "@/components/ComparisonCards";
 import MissedConnection from "@/components/MissedConnection";
 import OptionCard from "@/components/OptionCard";
 import RouteMap from "@/components/RouteMap";
+import HourlyCurves from "@/components/HourlyCurves";
 import PersonaSwitch, {
   PERSONA_DEFS,
   type PersonaId,
@@ -46,6 +47,15 @@ const PRIORITY_TO_METRIC: Record<Priority, string> = {
   "more-support": "support",
   "busier-surroundings": "activity",
   "lower-uncertainty": "uncertainty",
+};
+
+const PERSONA_FOCUS_TO_METRICS: Record<string, string[]> = {
+  functional_cost: ["duration", "walking", "transfers"],
+  waiting_burden: ["waiting"],
+  support_access: ["support"],
+  activity_context: ["activity"],
+  service_uncertainty: ["uncertainty"],
+  safety_exposure: ["safety"],
 };
 
 const TIME_COLORS = [
@@ -176,8 +186,8 @@ function CompareContent() {
   }, [origin, destination, timesParam]);
 
   const activeDef = PERSONA_DEFS.find((p) => p.id === persona)!;
-  const personaMetrics = activeDef.focusDimensions.map((d) =>
-    d.replace(/_/g, " ").split(" ")[0],
+  const personaMetrics = activeDef.focusDimensions.flatMap(
+    (dimension) => PERSONA_FOCUS_TO_METRICS[dimension] ?? [],
   );
   const highlightedMetrics = priorities.length > 0
     ? priorities.map((p) => PRIORITY_TO_METRIC[p])
@@ -210,7 +220,31 @@ function CompareContent() {
         </p>
       </section>
 
-      {/* ── Journey context + Persona switch ── */}
+      {/* ── Persona perspective switch ── */}
+      <section className="reveal-section mb-8">
+        <h2 className="text-lg font-semibold mb-2">Traveller perspectives</h2>
+        <p className="text-sm mb-4" style={{ color: "var(--text-secondary)" }}>
+          Choose one of the four late-night personas to foreground different burdens
+          on the same route.
+        </p>
+        <PersonaSwitch active={persona} onChange={setPersona} />
+      </section>
+
+      {/* ── Hourly curves ── */}
+      <section className="reveal-section card mb-8">
+        <h2 className="text-lg font-semibold mb-2">Hourly Curves of Extra Journey Burdens</h2>
+        <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>
+          Eight departure times, five dimensions. These curves trace how total time,
+          waiting, support nearby, service uncertainty, and safety shift from 06 to 03.
+        </p>
+        <HourlyCurves
+          origin={origin}
+          destination={destination}
+          highlightMetrics={highlightedMetrics}
+        />
+      </section>
+
+      {/* ── Journey context ── */}
       <section className="reveal-section card mb-6">
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <h2 className="text-sm font-semibold">Your journey tonight</h2>
@@ -232,12 +266,6 @@ function CompareContent() {
             ))}
           </div>
         )}
-      </section>
-
-      {/* ── Persona perspective switch ── */}
-      <section className="reveal-section mb-8">
-        <h2 className="text-lg font-semibold mb-4">Traveller perspective</h2>
-        <PersonaSwitch active={persona} onChange={setPersona} />
       </section>
 
       {/* ── Priority selector ── */}

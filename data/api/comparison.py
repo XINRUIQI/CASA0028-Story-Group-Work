@@ -552,6 +552,39 @@ async def _service_uncertainty(
     }
 
 
+def _hourly_uncertainty_score(journey: dict, headway_data: dict, time_str: str) -> dict:
+    band = time_to_band(time_str)
+    line_ids = {
+        leg.get("line_id", "")
+        for leg in journey.get("legs", [])
+        if not leg.get("is_walking") and leg.get("line_id")
+    }
+
+    gap_ratios = []
+    for line_id in line_ids:
+        hw = headway_data.get(line_id, {})
+        day_hw = hw.get("inter_peak", 5)
+        time_hw = hw.get(band, 10)
+        if day_hw > 0:
+            gap_ratios.append(round(time_hw / day_hw, 2))
+
+    mean_gap = round(sum(gap_ratios) / len(gap_ratios), 2) if gap_ratios else None
+    headway_component = 0
+    if mean_gap is not None:
+        headway_component = round(min(max((mean_gap - 1) / 2, 0), 1) * 70)
+
+    transfer_component = round(
+        min(journey.get("transfers", 0), 3) / 3 * 30
+    )
+
+    return {
+        "uncertainty_score_pct": min(100, headway_component + transfer_component),
+        "mean_headway_gap_ratio": mean_gap,
+        "headway_component": headway_component,
+        "transfer_component": transfer_component,
+    }
+
+
 def _support_access(journey: dict, time_str: str, route_context: Optional[dict] = None) -> dict:
     legs = journey.get("legs", [])
     total_open = 0
@@ -786,6 +819,7 @@ async def get_comparison_cards(
 async def get_hourly_curves(
     origin: str = Query(...),
     destination: str = Query(...),
+    times: str = Query("", description="Optional comma-separated departure times"),
     start_hour: int = Query(18, description="Start hour (inclusive)"),
     end_hour: int = Query(1, description="End hour (inclusive, wraps midnight)"),
     date: str = Query(""),
@@ -796,17 +830,20 @@ async def get_hourly_curves(
     """
     headway_data = _load_headway()
 
-    hours = []
-    h = start_hour
-    while True:
-        hours.append(h)
-        if h == end_hour:
-            break
-        h = (h + 1) % 24
+    if times.strip():
+        time_list = [t.strip() for t in times.split(",") if t.strip()]
+    else:
+        hours = []
+        h = start_hour
+        while True:
+            hours.append(h)
+            if h == end_hour:
+                break
+            h = (h + 1) % 24
+        time_list = [f"{h:02d}:00" for h in hours]
 
     curves: dict = {}
-    for h in hours:
-        t = f"{h:02d}:00"
+    for t in time_list:
         params = {**_ROUTE_PARAMS_BASE, "time": _to_tfl_time(t)}
         if date:
             params["date"] = date
@@ -824,6 +861,8 @@ async def get_hourly_curves(
         journey = _parse_journey(journeys_raw[0])
         wb = _waiting_burden(journey, headway_data, t)
         sa = _support_access(journey, t)
+        safety = _safety_exposure(journey, route_context=_route_safety_context(journey))
+        uncertainty = _hourly_uncertainty_score(journey, headway_data, t)
 
         # Recovery: max missed-connection penalty
         band = time_to_band(t)
@@ -842,6 +881,12 @@ async def get_hourly_curves(
             "wait_share": wb["wait_share_of_journey"],
             "support_open": sa["total_support_open"],
             "support_ratio": sa["support_open_ratio"],
+            "uncertainty_score_pct": uncertainty["uncertainty_score_pct"],
+            "mean_headway_gap_ratio": uncertainty["mean_headway_gap_ratio"],
+            "safety_score_pct": round(float(safety["route_safety_index"]) * 100)
+            if safety.get("route_safety_index") is not None
+            else None,
+            "safety_exposure_pct": safety.get("safety_exposure_pct"),
             "max_recovery_penalty_min": max_penalty,
         }
 
