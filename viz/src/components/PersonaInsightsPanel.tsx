@@ -1,16 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import Link from "next/link";
-import {
-  Bus,
-  Clock3,
-  CircleHelp,
-  Users,
-  Activity,
-  Lightbulb,
-  Star,
-} from "lucide-react";
 import { PERSONA_DEFS, type PersonaId } from "@/components/PersonaSwitch";
 import { api } from "@/lib/api";
 
@@ -337,7 +327,6 @@ function HourlyLineChart({
 
   return (
     <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="choose-line-svg">
-      {/* grid lines */}
       {hours.map((_, i) => {
         const x = CHART_PAD.left + (i / (hours.length - 1)) * CHART_CW;
         return (
@@ -353,7 +342,6 @@ function HourlyLineChart({
         );
       })}
 
-      {/* lines */}
       {CHART_LINES.map((line) => (
         <g key={line.key}>
           <path
@@ -378,7 +366,6 @@ function HourlyLineChart({
         </g>
       ))}
 
-      {/* annotations */}
       {annotations.map((a, i) => (
         <text
           key={i}
@@ -394,7 +381,6 @@ function HourlyLineChart({
         </text>
       ))}
 
-      {/* x-axis labels */}
       {hours.map((h, i) => {
         const x = CHART_PAD.left + (i / (hours.length - 1)) * CHART_CW;
         return (
@@ -414,87 +400,25 @@ function HourlyLineChart({
   );
 }
 
-/* ── Metric card ── */
+/* ── Main component ── */
 
-function MetricCard({
-  label,
-  value,
-  icon,
-}: {
-  label: string;
-  value: string;
-  icon: React.ReactNode;
-}) {
-  return (
-    <div className="choose-metric-card">
-      <div className="choose-metric-label">{label}</div>
-      <div className="choose-metric-value">{value}</div>
-      <div className="choose-metric-icon">{icon}</div>
-    </div>
-  );
+interface Props {
+  persona?: PersonaId;
+  onPersonaChange?: (p: PersonaId) => void;
 }
 
-/* ── Helpers ── */
+export default function PersonaInsightsPanel({
+  persona: personaProp,
+  onPersonaChange,
+}: Props = {}) {
+  const [personaState, setPersonaState] = useState<PersonaId>("student");
+  const persona = personaProp ?? personaState;
+  const setPersona = (p: PersonaId) => {
+    if (onPersonaChange) onPersonaChange(p);
+    if (personaProp === undefined) setPersonaState(p);
+  };
 
-function fmtBurden(cards: Record<string, unknown> | null | undefined): string {
-  if (!cards) return "—";
-  const v = Number(cards.total_expected_wait_min ?? 0);
-  if (v > 8) return "(High!)";
-  if (v > 3) return "(Mid)";
-  return "(Low)";
-}
-
-function fmtUncertainty(
-  cards: Record<string, unknown> | null | undefined,
-): string {
-  if (!cards) return "—";
-  const v = Number(cards.mean_headway_gap_ratio ?? 0);
-  return `${(v * 100).toFixed(1)}%`;
-}
-
-function fmtSupport(
-  cards: Record<string, unknown> | null | undefined,
-): string {
-  if (!cards) return "—";
-  const v = Number(cards.total_support_open ?? 0);
-  return v === 0 ? "(None)" : String(v);
-}
-
-function fmtDuration(
-  cards: Record<string, unknown> | null | undefined,
-): string {
-  if (!cards) return "—";
-  const v = Number(cards.total_duration_min ?? 0);
-  return v > 0 ? v.toFixed(2) : "—";
-}
-
-function fmtActivity(
-  cards: Record<string, unknown> | null | undefined,
-): string {
-  if (!cards) return "—";
-  const open = cards.open_count ?? cards.nearby_activity_open ?? null;
-  const total = cards.total_count ?? cards.nearby_activity_total ?? null;
-  if (open !== null && total !== null) return `${open}/${total}`;
-  return "—";
-}
-
-function fmtLighting(
-  cards: Record<string, unknown> | null | undefined,
-): string {
-  if (!cards) return "—";
-  const v = cards.lamp_count ?? cards.lamp_density ?? null;
-  if (v !== null) return String(Math.round(Number(v)));
-  return "—";
-}
-
-/* ── Page ── */
-
-export default function ChoosePage() {
-  const [persona, setPersona] = useState<PersonaId>("student");
   const [curves, setCurves] = useState<Record<string, HourlyPoint | null>>({});
-  const [rawCards, setRawCards] = useState<
-    Record<string, Record<string, Record<string, unknown>> | null>
-  >({});
   const [fetchedKey, setFetchedKey] = useState("");
 
   const preset = PRESET_ROUTES[persona];
@@ -508,14 +432,9 @@ export default function ChoosePage() {
       .then((res) => {
         if (stale) return;
         const pts: Record<string, HourlyPoint | null> = {};
-        const cards: Record<
-          string,
-          Record<string, Record<string, unknown>> | null
-        > = {};
         for (const [t, opt] of Object.entries(res.options)) {
           if (!opt) {
             pts[t] = null;
-            cards[t] = null;
             continue;
           }
           const c = opt.cards as Record<string, Record<string, unknown>>;
@@ -528,16 +447,13 @@ export default function ChoosePage() {
             recovery_penalty:
               Number(c.service_uncertainty?.mean_headway_gap_ratio ?? 0) * 5,
           };
-          cards[t] = c;
         }
         setCurves(pts);
-        setRawCards(cards);
         setFetchedKey(`${preset.origin}|${preset.dest}`);
       })
       .catch(() => {
         if (!stale) {
           setCurves({});
-          setRawCards({});
           setFetchedKey(`${preset.origin}|${preset.dest}`);
         }
       });
@@ -546,99 +462,42 @@ export default function ChoosePage() {
     };
   }, [preset.origin, preset.dest]);
 
-  const refCards = rawCards["22:00"] ?? rawCards["21:00"] ?? null;
-
   return (
-    <div className="choose-page">
-      <div className="choose-map-bg" />
-
-      <div className="choose-content">
-        {/* ── Persona portrait cards ── */}
-        <div className="choose-persona-row">
-          {PERSONA_DEFS.map((p) => {
-            const Portrait = PORTRAITS[p.id];
-            return (
-              <button
-                key={p.id}
-                className={`choose-persona-card ${persona === p.id ? "active" : ""}`}
-                onClick={() => setPersona(p.id)}
-              >
-                <div className="choose-persona-portrait">
-                  <Portrait />
-                </div>
-                <span className="choose-persona-name">[{p.label}]</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* ── Line chart ── */}
-        <div className="choose-chart-section">
-          <h3 className="choose-chart-title">
-            Hourly Curves of extra journey burdens (18:00 - 02:00)
-          </h3>
-          {loading ? (
-            <p className="choose-chart-loading">Loading hourly data…</p>
-          ) : Object.keys(curves).length === 0 ? (
-            <p className="choose-chart-loading">
-              Start the backend to enable live queries.
-            </p>
-          ) : (
-            <HourlyLineChart curves={curves} />
-          )}
-        </div>
-
-        {/* ── Bottom metric cards ── */}
-        <div className="choose-metrics-row">
-          <MetricCard
-            label="Functional Cost"
-            value={fmtDuration(refCards?.functional_cost)}
-            icon={<Bus size={18} />}
-          />
-          <MetricCard
-            label="Waiting Burden"
-            value={fmtBurden(refCards?.waiting_burden)}
-            icon={<Clock3 size={18} />}
-          />
-          <MetricCard
-            label="Service Uncertain"
-            value={fmtUncertainty(refCards?.service_uncertainty)}
-            icon={<CircleHelp size={18} />}
-          />
-          <MetricCard
-            label="Support Access"
-            value={fmtSupport(refCards?.support_access)}
-            icon={<Users size={18} />}
-          />
-          <MetricCard
-            label="Activity Context"
-            value={fmtActivity(refCards?.activity_context)}
-            icon={<Activity size={18} />}
-          />
-          <MetricCard
-            label="Lighting Proxy"
-            value={fmtLighting(refCards?.lighting_proxy)}
-            icon={<Lightbulb size={18} />}
-          />
-        </div>
-
-        {/* ── Navigation ── */}
-        <div className="choose-nav">
-          <Link
-            href={`/compare?origin=${preset.origin}&originName=${encodeURIComponent(preset.oName)}&destination=${preset.dest}&destinationName=${encodeURIComponent(preset.dName)}&times=18:00,21:00,23:30`}
-            className="choose-nav-btn"
-          >
-            Compare this journey →
-          </Link>
-          <Link href="/reflection" className="choose-nav-btn choose-nav-secondary">
-            Reflection & limits
-          </Link>
-        </div>
+    <div className="persona-insights-panel">
+      <div className="choose-persona-row">
+        {PERSONA_DEFS.map((p) => {
+          const Portrait = PORTRAITS[p.id];
+          return (
+            <button
+              key={p.id}
+              className={`choose-persona-card ${persona === p.id ? "active" : ""}`}
+              onClick={() => setPersona(p.id)}
+              type="button"
+            >
+              <div className="choose-persona-portrait">
+                <Portrait />
+              </div>
+              <span className="choose-persona-name">[{p.label}]</span>
+            </button>
+          );
+        })}
       </div>
 
-      <div className="choose-sparkle">
-        <Star size={18} />
+      <div className="choose-chart-section">
+        <h3 className="choose-chart-title">
+          Hourly Curves of extra journey burdens (18:00 - 02:00)
+        </h3>
+        {loading ? (
+          <p className="choose-chart-loading">Loading hourly data…</p>
+        ) : Object.keys(curves).length === 0 ? (
+          <p className="choose-chart-loading">
+            Start the backend to enable live queries.
+          </p>
+        ) : (
+          <HourlyLineChart curves={curves} />
+        )}
       </div>
+
     </div>
   );
 }

@@ -11,7 +11,6 @@ const NAV_ITEMS = [
   { href: "/compare", label: "Compare" },
   { href: "/unpack", label: "Mechanisms" },
   { href: "/fairness", label: "Fairness" },
-  { href: "/choose", label: "Choose" },
   { href: "/reflection", label: "Reflection" },
 ];
 

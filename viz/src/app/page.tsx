@@ -4,13 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Clock, ShieldCheck, Activity, HelpCircle } from "lucide-react";
 import HeroCover from "@/components/HeroCover";
-import PresetJourneys from "@/components/PresetJourneys";
-import StopPointSearch from "@/components/StopPointSearch";
-import TimeSelector from "@/components/TimeSelector";
 import DimensionCard from "@/components/DimensionCard";
 import { useReveal } from "@/lib/useReveal";
 import type { ContextTag } from "@/lib/types";
-import type { StopPointMatch } from "@/lib/api";
 
 /* ── Page 1: Context checkboxes ──────────────────────────────── */
 
@@ -153,12 +149,7 @@ export default function LandingPage() {
   const router = useRouter();
   const revealRef = useReveal();
 
-  const [origin, setOrigin] = useState<StopPointMatch | null>(null);
-  const [destination, setDestination] = useState<StopPointMatch | null>(null);
-  const [times, setTimes] = useState<string[]>(["18:00", "21:00", "22:30"]);
   const [contexts, setContexts] = useState<ContextTag[]>([]);
-
-  const canCompare = origin && destination && times.length >= 2;
 
   const toggleContext = (ctx: ContextTag) => {
     setContexts((prev) =>
@@ -178,10 +169,10 @@ export default function LandingPage() {
   }
 
   const CONTEXT_COLORS: Record<ContextTag, string> = {
-    "travelling-alone": "#c9a96e",
-    "returning-late": "#d4b77d",
-    "carrying-bags": "#b8a472",
-    "unfamiliar-area": "#d4946a",
+    "travelling-alone": "#8b7bd8",
+    "returning-late": "#d65a7e",
+    "carrying-bags": "#6abfa8",
+    "unfamiliar-area": "#e07a5f",
     commuting: "#a8894f",
     "student-budget": "#b8a472",
   };
@@ -190,27 +181,6 @@ export default function LandingPage() {
     contexts.length === 0
       ? "#c9a96e"
       : CONTEXT_COLORS[contexts[contexts.length - 1]] ?? "#c9a96e";
-
-  const handleCompare = () => {
-    if (!canCompare) return;
-    const originId =
-      origin.lat && origin.lon
-        ? `${origin.lat},${origin.lon}`
-        : origin.naptan_id;
-    const destId =
-      destination.lat && destination.lon
-        ? `${destination.lat},${destination.lon}`
-        : destination.naptan_id;
-    const params = new URLSearchParams({
-      origin: originId,
-      originName: origin.name,
-      destination: destId,
-      destinationName: destination.name,
-      times: times.join(","),
-      contexts: contexts.join(","),
-    });
-    router.push(`/compare?${params.toString()}`);
-  };
 
   return (
     <>
@@ -293,66 +263,30 @@ export default function LandingPage() {
                 </ul>
               )}
             </div>
+
+            {/* Jump to compare page */}
+            <div className="ctx-cta-wrap">
+              <button
+                type="button"
+                className="hero-cta"
+                onClick={() => {
+                  const params = new URLSearchParams();
+                  if (contexts.length > 0) {
+                    params.set("contexts", contexts.join(","));
+                  }
+                  const qs = params.toString();
+                  router.push(qs ? `/compare?${qs}` : "/compare");
+                }}
+              >
+                Choose my journey
+              </button>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* ═══════════════ Below: Journey selection ═══════════════ */}
+      {/* ═══════════════ Below: After-dark dimensions ═══════════════ */}
       <div ref={revealRef} className="max-w-5xl mx-auto px-6 py-20">
-        {/* ── Preset journeys ── */}
-        <section className="reveal-section mb-6">
-          <p className="section-label">Try a preset journey</p>
-          <p
-            className="text-sm mb-4"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            Each route represents a typical late-night scenario. Click to see how
-            it changes across departure times.
-          </p>
-          <PresetJourneys />
-        </section>
-
-        {/* ── OR divider ── */}
-        <div className="section-or reveal-section">or enter your own</div>
-
-        {/* ── Custom journey input ── */}
-        <section className="reveal-section card mb-8">
-          <h2 className="text-lg font-semibold mb-4">Plan your own journey</h2>
-          <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
-            On the static site, only common London stations are searchable.
-            For full search, run the backend locally.
-          </p>
-          <div className="grid md:grid-cols-2 gap-4 mb-4">
-            <StopPointSearch
-              label="From"
-              placeholder="Search origin stop or station..."
-              onSelect={setOrigin}
-            />
-            <StopPointSearch
-              label="To"
-              placeholder="Search destination stop or station..."
-              onSelect={setDestination}
-            />
-          </div>
-          <TimeSelector selected={times} onChange={setTimes} />
-        </section>
-
-        {/* ── Compare button ── */}
-        <div className="reveal-section text-center mb-20">
-          <button
-            className="btn-primary text-lg px-8 py-3"
-            disabled={!canCompare}
-            onClick={handleCompare}
-          >
-            Compare this journey
-          </button>
-          {!canCompare && (
-            <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>
-              Select origin, destination, and at least two departure times.
-            </p>
-          )}
-        </div>
-
         {/* ── What changes after dark ── */}
         <section className="reveal-section mb-12">
           <h2 className="text-xl font-semibold text-center mb-6">

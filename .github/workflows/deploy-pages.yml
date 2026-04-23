@@ -1,5 +1,5 @@
 # CI + Deploy
-# Runs lint & data API checks on every push / PR to QXR.
+# Runs lint & data API checks on every push / PR to main or QXR.
 # On push (not PR), also builds and deploys static viz to GitHub Pages.
 #
 # Setup (one-time):
@@ -13,9 +13,9 @@ name: CI / Deploy
 
 on:
   push:
-    branches: [QXR]
+    branches: [main, QXR]
   pull_request:
-    branches: [QXR]
+    branches: [main, QXR]
   workflow_dispatch:
 
 permissions:

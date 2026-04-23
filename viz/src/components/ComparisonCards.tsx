@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  Clock,
-  Timer,
-  ShieldAlert,
-  ShieldCheck,
-  Activity,
-  Lightbulb,
-} from "lucide-react";
+import { Clock, ShieldCheck, Lightbulb } from "lucide-react";
 import type { CardData } from "@/lib/api";
 
 interface ComparisonCardsProps {
@@ -38,32 +31,6 @@ const CARD_DEFS: CardDef[] = [
     note: "Total journey time, walking, transfers, fare.",
   },
   {
-    key: "waiting_burden",
-    title: "Waiting burden",
-    icon: <Timer size={18} />,
-    accent: "var(--accent-rose)",
-    render: (c) => ({
-      primary: `~${c.total_expected_wait_min ?? "—"} min expected wait`,
-      secondary: `Max single wait: ${c.max_single_wait_min ?? "—"} min · ${Math.round(Number(c.wait_share_of_journey ?? 0) * 100)}% of journey`,
-    }),
-    note: "Estimated from headway. Random-arrival assumption.",
-  },
-  {
-    key: "service_uncertainty",
-    title: "Service uncertainty",
-    icon: <ShieldAlert size={18} />,
-    accent: "var(--accent-amber)",
-    render: (c) => ({
-      primary: c.disruption_count
-        ? `${c.disruption_count} disruption(s) reported`
-        : "No disruptions reported",
-      secondary: c.mean_headway_gap_ratio
-        ? `Headway gap ratio: ${c.mean_headway_gap_ratio}× vs daytime`
-        : "Headway data unavailable",
-    }),
-    note: "Inferred from timetables and status, not true delay probability.",
-  },
-  {
     key: "support_access",
     title: "Support access",
     icon: <ShieldCheck size={18} />,
@@ -75,17 +42,6 @@ const CARD_DEFS: CardDef[] = [
         : "Open ratio unavailable",
     }),
     note: "Shops, pharmacies, toilets, AEDs within 300m of stops.",
-  },
-  {
-    key: "activity_context",
-    title: "Activity context",
-    icon: <Activity size={18} />,
-    accent: "var(--accent-amber)",
-    render: (c) => ({
-      primary: `${c.open_support_density ?? "—"} mean open POIs per stop`,
-      secondary: c.nte_data_available ? "Night-time economy data available" : "Limited activity data",
-    }),
-    note: "Proxy for 'someone is around', not real-time crowd count.",
   },
   {
     key: "lighting_proxy",

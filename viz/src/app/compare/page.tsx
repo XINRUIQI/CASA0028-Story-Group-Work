@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import TagSelector from "@/components/TagSelector";
 import JourneyTimeline from "@/components/JourneyTimeline";
@@ -13,6 +13,11 @@ import PersonaSwitch, {
   PERSONA_DEFS,
   type PersonaId,
 } from "@/components/PersonaSwitch";
+import PersonaInsightsPanel from "@/components/PersonaInsightsPanel";
+import PresetJourneys from "@/components/PresetJourneys";
+import StopPointSearch from "@/components/StopPointSearch";
+import TimeSelector from "@/components/TimeSelector";
+import type { StopPointMatch } from "@/lib/api";
 import { useReveal } from "@/lib/useReveal";
 import {
   PRIORITY_LABELS,
@@ -63,6 +68,7 @@ const DEFAULT_DEST_NAME = "Seven Sisters";
 
 function CompareContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const origin = searchParams.get("origin") || DEFAULT_ORIGIN;
   const originName = searchParams.get("originName") || (searchParams.get("origin") ? searchParams.get("origin")! : DEFAULT_ORIGIN_NAME);
   const destination = searchParams.get("destination") || DEFAULT_DEST;
@@ -74,6 +80,40 @@ function CompareContent() {
   const contexts = contextsParam.split(",").filter(Boolean) as ContextTag[];
   const [priorities, setPriorities] = useState<Priority[]>([]);
   const [persona, setPersona] = useState<PersonaId>("student");
+
+  /* ── Plan-your-own-journey local state ── */
+  const [planOrigin, setPlanOrigin] = useState<StopPointMatch | null>(null);
+  const [planDestination, setPlanDestination] = useState<StopPointMatch | null>(
+    null,
+  );
+  const [planTimes, setPlanTimes] = useState<string[]>([
+    "18:00",
+    "21:00",
+    "22:30",
+  ]);
+  const canSubmitPlan =
+    !!planOrigin && !!planDestination && planTimes.length >= 2;
+
+  const handleSubmitPlan = () => {
+    if (!canSubmitPlan || !planOrigin || !planDestination) return;
+    const originId =
+      planOrigin.lat && planOrigin.lon
+        ? `${planOrigin.lat},${planOrigin.lon}`
+        : planOrigin.naptan_id;
+    const destId =
+      planDestination.lat && planDestination.lon
+        ? `${planDestination.lat},${planDestination.lon}`
+        : planDestination.naptan_id;
+    const params = new URLSearchParams({
+      origin: originId,
+      originName: planOrigin.name,
+      destination: destId,
+      destinationName: planDestination.name,
+      times: planTimes.join(","),
+      contexts: contexts.join(","),
+    });
+    router.push(`/compare?${params.toString()}`);
+  };
 
   const [data, setData] = useState<CompareResult | null>(null);
   const [cardsData, setCardsData] = useState<CompareCardsResult | null>(null);
@@ -134,6 +174,14 @@ function CompareContent() {
         <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
           These are not final recommendations. They are comparable trade-offs.
         </p>
+      </section>
+
+      {/* ── Persona insights (merged from choose page) ── */}
+      <section className="reveal-section mb-8">
+        <PersonaInsightsPanel
+          persona={persona}
+          onPersonaChange={setPersona}
+        />
       </section>
 
       {/* ── Journey context + Persona switch ── */}
@@ -200,6 +248,63 @@ function CompareContent() {
 
       {data && !loading && (
         <>
+          {/* ── Try a preset journey (from page 0) ── */}
+          <section className="reveal-section mb-6">
+            <p className="section-label">Try a preset journey</p>
+            <p
+              className="text-sm mb-4"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              Each route represents a typical late-night scenario. Click to see
+              how it changes across departure times.
+            </p>
+            <PresetJourneys />
+          </section>
+
+          {/* ── OR divider ── */}
+          <div className="section-or reveal-section">or enter your own</div>
+
+          {/* ── Custom journey input (from page 0) ── */}
+          <section className="reveal-section card mb-8">
+            <h2 className="text-lg font-semibold mb-4">Plan your own journey</h2>
+            <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
+              On the static site, only common London stations are searchable.
+              For full search, run the backend locally.
+            </p>
+            <div className="grid md:grid-cols-2 gap-4 mb-4">
+              <StopPointSearch
+                label="From"
+                placeholder="Search origin stop or station..."
+                onSelect={setPlanOrigin}
+              />
+              <StopPointSearch
+                label="To"
+                placeholder="Search destination stop or station..."
+                onSelect={setPlanDestination}
+              />
+            </div>
+            <TimeSelector selected={planTimes} onChange={setPlanTimes} />
+          </section>
+
+          {/* ── Compare button ── */}
+          <div className="reveal-section text-center mb-10">
+            <button
+              className="btn-primary text-lg px-8 py-3"
+              disabled={!canSubmitPlan}
+              onClick={handleSubmitPlan}
+            >
+              Compare this journey
+            </button>
+            {!canSubmitPlan && (
+              <p
+                className="text-xs mt-2"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Select origin, destination, and at least two departure times.
+              </p>
+            )}
+          </div>
+
           {/* ── Three-column route maps ── */}
           <section className="reveal-section mb-10">
             <h2 className="text-lg font-semibold mb-2">Route maps by departure time</h2>

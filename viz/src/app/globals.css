@@ -395,6 +395,12 @@ body {
   border-color: var(--champagne-gold-dim);
   transition: border-color 0.4s, box-shadow 0.4s;
 }
+
+.ctx-cta-wrap {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.5rem;
+}
 .ctx-needs-card.has-needs {
   border-color: var(--champagne-gold);
   box-shadow:
