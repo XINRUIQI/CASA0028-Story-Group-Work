@@ -136,6 +136,28 @@ def _decode_polyline(encoded: str) -> list[tuple[float, float]]:
     return coords
 
 
+def _parse_linestring_path(path: str) -> list[tuple[float, float]]:
+    if not isinstance(path, str) or not path.strip().startswith("[["):
+        return []
+    try:
+        parsed = json.loads(path)
+    except json.JSONDecodeError:
+        return []
+
+    coords: list[tuple[float, float]] = []
+    if not isinstance(parsed, list):
+        return coords
+    for pair in parsed:
+        if not isinstance(pair, list | tuple) or len(pair) < 2:
+            continue
+        lat, lon = pair[0], pair[1]
+        try:
+            coords.append((float(lon), float(lat)))
+        except (TypeError, ValueError):
+            continue
+    return coords
+
+
 def _safe_point(payload: dict) -> Point | None:
     lat = payload.get("lat")
     lon = payload.get("lon")
@@ -148,10 +170,12 @@ def _leg_linestring(leg: dict) -> LineString | None:
     path = leg.get("path", "")
     coords: list[tuple[float, float]] = []
     if isinstance(path, str) and path:
-        try:
-            coords = _decode_polyline(path)
-        except Exception:
-            coords = []
+        coords = _parse_linestring_path(path)
+        if not coords:
+            try:
+                coords = _decode_polyline(path)
+            except Exception:
+                coords = []
 
     if len(coords) >= 2:
         return LineString(coords)

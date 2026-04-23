@@ -12,10 +12,26 @@ const MAPBOX_TOKEN =
 type RouteMapTheme = "day" | "evening" | "night";
 
 const MAP_STYLES: Record<RouteMapTheme, string> = {
-  day: "mapbox://styles/mapbox/light-v11",
-  evening: "mapbox://styles/mapbox/streets-v12",
-  night: "mapbox://styles/mapbox/dark-v11",
+  day: "mapbox://styles/mapbox/streets-v12",
+  evening: "mapbox://styles/mapbox/navigation-day-v1",
+  night: "mapbox://styles/mapbox/navigation-night-v1",
 };
+
+function parseLineStringPath(path: string): [number, number][] | null {
+  if (!path.trim().startsWith("[[")) return null;
+
+  try {
+    const parsed = JSON.parse(path) as [number, number][];
+    if (!Array.isArray(parsed)) return null;
+    const coords = parsed
+      .filter((pair) => Array.isArray(pair) && pair.length >= 2)
+      .map(([lat, lon]) => [Number(lon), Number(lat)] as [number, number])
+      .filter(([lon, lat]) => Number.isFinite(lon) && Number.isFinite(lat));
+    return coords.length >= 2 ? coords : null;
+  } catch {
+    return null;
+  }
+}
 
 function decodePolyline(encoded: string): [number, number][] {
   const coords: [number, number][] = [];
@@ -93,7 +109,7 @@ export default function RouteMap({
       legs.forEach((leg, i) => {
         let coords: [number, number][] = [];
         if (leg.path) {
-          coords = decodePolyline(leg.path);
+          coords = parseLineStringPath(leg.path) || decodePolyline(leg.path);
         } else {
           const depLat = leg.departure_point.lat;
           const depLon = leg.departure_point.lon;
