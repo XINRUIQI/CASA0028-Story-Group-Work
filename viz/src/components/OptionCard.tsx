@@ -6,12 +6,15 @@ import {
   Footprints,
   ArrowLeftRight,
   Timer,
+  ShieldAlert,
   ShieldCheck,
   Activity,
   HelpCircle,
   Coins,
 } from "lucide-react";
 import Link from "next/link";
+import { formatDisplayTime } from "@/lib/journeyPresets";
+import { normalizeServiceUncertainty } from "@/lib/serviceUncertainty";
 
 interface OptionCardProps {
   time: string;
@@ -38,7 +41,7 @@ export default function OptionCard({
     return (
       <div className="card opacity-60">
         <h3 className="font-semibold text-lg mb-2">
-          Option {LETTER[index]} · {time}
+          Time {LETTER[index]} · {formatDisplayTime(time)}
         </h3>
         <p style={{ color: "var(--text-muted)" }}>
           No route available for this departure time.
@@ -57,9 +60,16 @@ export default function OptionCard({
   const activityCard = cards?.activity_context as {
     route_activity_index?: number;
   } | undefined;
-  const uncertaintyCard = cards?.service_uncertainty as {
-    disruption_count?: number;
+  const safetyCard = cards?.safety_exposure as {
+    safety_exposure_pct?: number;
+    exposure_label?: string;
+    safety_exposure_label?: string;
+    route_safety_index?: number;
   } | undefined;
+  const uncertainty = normalizeServiceUncertainty(
+    cards?.service_uncertainty,
+    journey.transfers,
+  );
 
   const waitingText = waitingCard?.total_expected_wait_min != null
     ? `~${Number(waitingCard.total_expected_wait_min).toFixed(1).replace(/\.0$/, "")} min`
@@ -72,8 +82,14 @@ export default function OptionCard({
   const activityText = activityCard?.route_activity_index != null
     ? `Index ${Number(activityCard.route_activity_index).toFixed(2)}`
     : "—";
-  const uncertaintyText = uncertaintyCard?.disruption_count != null
-    ? `${Number(uncertaintyCard.disruption_count)} disruption${Number(uncertaintyCard.disruption_count) === 1 ? "" : "s"}`
+  const safetyLabel = safetyCard?.exposure_label ?? safetyCard?.safety_exposure_label;
+  const safetyText = safetyCard?.safety_exposure_pct != null
+    ? `${Math.round(Number(safetyCard.safety_exposure_pct))}% exposure${safetyLabel ? ` · ${String(safetyLabel)}` : ""}`
+    : safetyCard?.route_safety_index != null
+      ? `Safety ${Number(safetyCard.route_safety_index).toFixed(2)}`
+      : "—";
+  const uncertaintyText = uncertainty.scorePct != null
+    ? `${Math.round(uncertainty.scorePct)}% index${uncertainty.label ? ` · ${uncertainty.label}` : ""}`
     : "—";
 
   const metrics = [
@@ -120,9 +136,15 @@ export default function OptionCard({
       value: activityText,
     },
     {
+      key: "safety",
+      icon: <ShieldAlert size={14} />,
+      label: "Safety exposure",
+      value: safetyText,
+    },
+    {
       key: "uncertainty",
       icon: <HelpCircle size={14} />,
-      label: "Service uncertainty",
+      label: "Service uncertainty index",
       value: uncertaintyText,
     },
   ];
@@ -130,8 +152,8 @@ export default function OptionCard({
   return (
     <div className="card flex flex-col">
       <h3 className="font-semibold text-lg mb-4">
-        Option {LETTER[index]}{" "}
-        <span style={{ color: "var(--accent-amber)" }}>· {time}</span>
+        Time {LETTER[index]}{" "}
+        <span style={{ color: "var(--accent-amber)" }}>· {formatDisplayTime(time)}</span>
       </h3>
 
       <div className="grid grid-cols-2 gap-3 mb-4">

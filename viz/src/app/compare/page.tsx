@@ -26,6 +26,13 @@ import {
   type CompareCardsResult,
   type CardData,
 } from "@/lib/api";
+import {
+  COMPARE_TIMES,
+  FIXED_ROUTE_PRESETS,
+  TIME_OF_DAY_LABELS,
+  encodeCompareTimes,
+  formatDisplayTime,
+} from "@/lib/journeyPresets";
 
 const PRIORITY_OPTIONS = Object.entries(PRIORITY_LABELS).map(([value, label]) => ({
   value: value as Priority,
@@ -39,14 +46,6 @@ const PRIORITY_TO_METRIC: Record<Priority, string> = {
   "more-support": "support",
   "busier-surroundings": "activity",
   "lower-uncertainty": "uncertainty",
-};
-
-const TIME_LABELS: Record<string, string> = {
-  "18:00": "☀️ Daytime",
-  "21:00": "🌆 Evening",
-  "22:30": "🌙 Late Night",
-  "23:00": "🌙 Late Night",
-  "23:30": "🌙 Late Night",
 };
 
 const TIME_COLORS = [
@@ -115,10 +114,10 @@ async function loadStaticCompareCards(
   }
 }
 
-const DEFAULT_ORIGIN = "940GZZLUESQ";
-const DEFAULT_ORIGIN_NAME = "Euston Square";
-const DEFAULT_DEST = "HUBSVS";
-const DEFAULT_DEST_NAME = "Seven Sisters";
+const DEFAULT_ORIGIN = FIXED_ROUTE_PRESETS.student.origin;
+const DEFAULT_ORIGIN_NAME = FIXED_ROUTE_PRESETS.student.originName;
+const DEFAULT_DEST = FIXED_ROUTE_PRESETS.student.destination;
+const DEFAULT_DEST_NAME = FIXED_ROUTE_PRESETS.student.destinationName;
 
 function CompareContent() {
   const searchParams = useSearchParams();
@@ -126,7 +125,7 @@ function CompareContent() {
   const originName = searchParams.get("originName") || (searchParams.get("origin") ? searchParams.get("origin")! : DEFAULT_ORIGIN_NAME);
   const destination = searchParams.get("destination") || DEFAULT_DEST;
   const destinationName = searchParams.get("destinationName") || (searchParams.get("destination") ? searchParams.get("destination")! : DEFAULT_DEST_NAME);
-  const timesParam = searchParams.get("times") || "18:00,21:00,23:30";
+  const timesParam = searchParams.get("times") || encodeCompareTimes(COMPARE_TIMES);
   const contextsParam = searchParams.get("contexts") || "";
 
   const times = timesParam.split(",").filter(Boolean);
@@ -279,7 +278,7 @@ function CompareContent() {
                   <RouteMap
                     key={t}
                     legs={j.legs}
-                    label={TIME_LABELS[t] || t}
+                    label={TIME_OF_DAY_LABELS[t] || formatDisplayTime(t)}
                     accent={TIME_COLORS[i % TIME_COLORS.length]}
                     supportCount={supportOpen != null ? Number(supportOpen) : undefined}
                     supportSummary={buildRouteSupportSummary(supportCard, activityCard)}
@@ -305,7 +304,7 @@ function CompareContent() {
                     key={t}
                     legs={j.legs}
                     totalDuration={j.duration_min}
-                    label={t}
+                    label={formatDisplayTime(t)}
                     accent={TIME_COLORS[i % TIME_COLORS.length]}
                   />
                 );
@@ -341,7 +340,7 @@ function CompareContent() {
                 Trade-off comparison
               </h2>
               <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>
-                Six dimensions, side by side. No single score.
+                Seven dimensions, side by side. No single score.
               </p>
               <ComparisonCards cardsByTime={cardsByTime} times={times} />
             </section>
@@ -365,7 +364,7 @@ function CompareContent() {
                       : undefined
                   }
                 >
-                  {t}
+                  {`${TIME_OF_DAY_LABELS[t] || ""} ${formatDisplayTime(t)}`.trim()}
                 </button>
               ))}
             </div>

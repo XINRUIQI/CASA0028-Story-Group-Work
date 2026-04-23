@@ -13,54 +13,55 @@ import {
 } from "lucide-react";
 import { PERSONA_DEFS, type PersonaId } from "@/components/PersonaSwitch";
 import { api } from "@/lib/api";
+import {
+  COMPARE_TIMES,
+  DISPLAY_TIME_LABELS,
+  FIXED_ROUTE_PRESETS,
+  encodeCompareTimes,
+} from "@/lib/journeyPresets";
+import { normalizeServiceUncertainty } from "@/lib/serviceUncertainty";
 
 const PRESET_ROUTES: Record<
   PersonaId,
   { origin: string; dest: string; oName: string; dName: string }
 > = {
   student: {
-    origin: "940GZZLUESQ",
-    dest: "HUBSVS",
-    oName: "Euston Square",
-    dName: "Seven Sisters",
+    origin: FIXED_ROUTE_PRESETS.student.origin,
+    dest: FIXED_ROUTE_PRESETS.student.destination,
+    oName: FIXED_ROUTE_PRESETS.student.originName,
+    dName: FIXED_ROUTE_PRESETS.student.destinationName,
   },
   budget: {
-    origin: "940GZZLUSTD",
-    dest: "940GZZLUBXN",
-    oName: "Stratford",
-    dName: "Brixton",
+    origin: FIXED_ROUTE_PRESETS.budget.origin,
+    dest: FIXED_ROUTE_PRESETS.budget.destination,
+    oName: FIXED_ROUTE_PRESETS.budget.originName,
+    dName: FIXED_ROUTE_PRESETS.budget.destinationName,
   },
   nightworker: {
-    origin: "940GZZLUKSX",
-    dest: "940GZZLUBKG",
-    oName: "King's Cross",
-    dName: "Barking",
+    origin: FIXED_ROUTE_PRESETS.nightworker.origin,
+    dest: FIXED_ROUTE_PRESETS.nightworker.destination,
+    oName: FIXED_ROUTE_PRESETS.nightworker.originName,
+    dName: FIXED_ROUTE_PRESETS.nightworker.destinationName,
   },
   unfamiliar: {
-    origin: "940GZZLUPAC",
-    dest: "HUBGNW",
-    oName: "Paddington",
-    dName: "Greenwich",
+    origin: FIXED_ROUTE_PRESETS.unfamiliar.origin,
+    dest: FIXED_ROUTE_PRESETS.unfamiliar.destination,
+    oName: FIXED_ROUTE_PRESETS.unfamiliar.originName,
+    dName: FIXED_ROUTE_PRESETS.unfamiliar.destinationName,
   },
 };
 
 const HOURS = [
-  "18:00",
+  "14:00",
   "19:00",
-  "20:00",
-  "21:00",
-  "22:00",
-  "23:00",
   "00:00",
-  "01:00",
-  "02:00",
 ];
 
 interface HourlyPoint {
   duration_min: number;
   waiting_burden: number;
   support_open: number;
-  recovery_penalty: number;
+  service_uncertainty: number;
 }
 
 /* ── Portrait SVGs ── */
@@ -249,8 +250,8 @@ const CHART_LINES = [
     color: "var(--accent-emerald)",
   },
   {
-    key: "recovery_penalty" as const,
-    label: "Recovery penalty",
+    key: "service_uncertainty" as const,
+    label: "Uncertainty index",
     color: "var(--accent-amber)",
   },
   {
@@ -289,6 +290,7 @@ function HourlyLineChart({
   curves: Record<string, HourlyPoint | null>;
 }) {
   const hours = HOURS.filter((h) => curves[h] !== undefined);
+  const denominator = Math.max(hours.length - 1, 1);
 
   const normed = useMemo(() => {
     if (hours.length === 0) return {};
@@ -301,7 +303,7 @@ function HourlyLineChart({
       const range = max - min || 1;
       result[line.key] = hours.map((h, i) => {
         const v = curves[h]?.[line.key] ?? null;
-        const x = CHART_PAD.left + (i / (hours.length - 1)) * CHART_CW;
+        const x = CHART_PAD.left + (i / denominator) * CHART_CW;
         const y =
           v !== null
             ? CHART_PAD.top + (1 - (v - min) / range) * CHART_CH
@@ -310,27 +312,27 @@ function HourlyLineChart({
       });
     }
     return result;
-  }, [curves, hours]);
+  }, [curves, denominator, hours]);
 
   if (hours.length === 0) return null;
 
   const annotations = [
     {
-      x: CHART_PAD.left + (1 / (hours.length - 1)) * CHART_CW,
+      x: CHART_PAD.left + (1 / denominator) * CHART_CW,
       y: CHART_PAD.top + 6,
-      text: "Waiting burden increases (High!)",
+      text: "Afternoon baseline",
       anchor: "start" as const,
     },
     {
-      x: CHART_PAD.left + (4 / (hours.length - 1)) * CHART_CW,
+      x: CHART_PAD.left + (1 / denominator) * CHART_CW,
       y: CHART_PAD.top + CHART_CH * 0.38,
-      text: "Nearby Support Drops (Mid)",
+      text: "Evening transition",
       anchor: "middle" as const,
     },
     {
-      x: CHART_PAD.left + (7 / (hours.length - 1)) * CHART_CW,
+      x: CHART_PAD.left + (2 / denominator) * CHART_CW,
       y: CHART_PAD.top + 14,
-      text: "Recovery Penalty Increases",
+      text: "Late-night conditions",
       anchor: "end" as const,
     },
   ];
@@ -339,7 +341,7 @@ function HourlyLineChart({
     <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="choose-line-svg">
       {/* grid lines */}
       {hours.map((_, i) => {
-        const x = CHART_PAD.left + (i / (hours.length - 1)) * CHART_CW;
+        const x = CHART_PAD.left + (i / denominator) * CHART_CW;
         return (
           <line
             key={i}
@@ -396,7 +398,7 @@ function HourlyLineChart({
 
       {/* x-axis labels */}
       {hours.map((h, i) => {
-        const x = CHART_PAD.left + (i / (hours.length - 1)) * CHART_CW;
+        const x = CHART_PAD.left + (i / denominator) * CHART_CW;
         return (
           <text
             key={h}
@@ -406,7 +408,7 @@ function HourlyLineChart({
             fill="var(--text-muted)"
             fontSize="11"
           >
-            {h}
+            {DISPLAY_TIME_LABELS[h] ?? h}
           </text>
         );
       })}
@@ -447,9 +449,9 @@ function fmtBurden(cards: Record<string, unknown> | null | undefined): string {
 function fmtUncertainty(
   cards: Record<string, unknown> | null | undefined,
 ): string {
-  if (!cards) return "—";
-  const v = Number(cards.mean_headway_gap_ratio ?? 0);
-  return `${(v * 100).toFixed(1)}%`;
+  const uncertainty = normalizeServiceUncertainty(cards);
+  if (uncertainty.scorePct == null) return "—";
+  return `${Math.round(uncertainty.scorePct)}%`;
 }
 
 function fmtSupport(
@@ -525,8 +527,9 @@ export default function ChoosePage() {
               c.waiting_burden?.total_expected_wait_min ?? 0,
             ),
             support_open: Number(c.support_access?.total_support_open ?? 0),
-            recovery_penalty:
-              Number(c.service_uncertainty?.mean_headway_gap_ratio ?? 0) * 5,
+            service_uncertainty: Number(
+              c.service_uncertainty?.uncertainty_score_pct ?? 0,
+            ),
           };
           cards[t] = c;
         }
@@ -546,7 +549,7 @@ export default function ChoosePage() {
     };
   }, [preset.origin, preset.dest]);
 
-  const refCards = rawCards["22:00"] ?? rawCards["21:00"] ?? null;
+  const refCards = rawCards[COMPARE_TIMES[1]] ?? rawCards[COMPARE_TIMES[0]] ?? null;
 
   return (
     <div className="choose-page">
@@ -575,7 +578,7 @@ export default function ChoosePage() {
         {/* ── Line chart ── */}
         <div className="choose-chart-section">
           <h3 className="choose-chart-title">
-            Hourly Curves of extra journey burdens (18:00 - 02:00)
+            How this route shifts across daytime, evening, and late night
           </h3>
           {loading ? (
             <p className="choose-chart-loading">Loading hourly data…</p>
@@ -625,7 +628,7 @@ export default function ChoosePage() {
         {/* ── Navigation ── */}
         <div className="choose-nav">
           <Link
-            href={`/compare?origin=${preset.origin}&originName=${encodeURIComponent(preset.oName)}&destination=${preset.dest}&destinationName=${encodeURIComponent(preset.dName)}&times=18:00,21:00,23:30`}
+            href={`/compare?origin=${preset.origin}&originName=${encodeURIComponent(preset.oName)}&destination=${preset.dest}&destinationName=${encodeURIComponent(preset.dName)}&times=${encodeURIComponent(encodeCompareTimes(COMPARE_TIMES))}`}
             className="choose-nav-btn"
           >
             Compare this journey →

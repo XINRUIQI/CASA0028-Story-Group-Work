@@ -21,7 +21,7 @@ CORS_ORIGINS = [
 ]
 
 # ── Default time slots for comparison ────────────────────────────
-DEFAULT_DEPARTURE_TIMES = ["09:00", "18:00", "21:00", "23:30"]
+DEFAULT_DEPARTURE_TIMES = ["14:00", "19:00", "00:00"]
 
 TIME_BANDS = {
     "am_peak":    (7, 10),

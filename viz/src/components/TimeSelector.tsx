@@ -1,6 +1,11 @@
 "use client";
 
-const PRESET_TIMES = ["18:00", "21:00", "23:00"];
+import {
+  COMPARE_TIMES,
+  formatDisplayTime,
+} from "@/lib/journeyPresets";
+
+const PRESET_TIMES = [...COMPARE_TIMES];
 
 interface TimeSelectorProps {
   selected: string[];
@@ -12,7 +17,11 @@ export default function TimeSelector({ selected, onChange }: TimeSelectorProps) 
     if (selected.includes(time)) {
       onChange(selected.filter((t) => t !== time));
     } else {
-      onChange([...selected, time].sort());
+      onChange(
+        [...selected, time].sort(
+          (left, right) => PRESET_TIMES.indexOf(left) - PRESET_TIMES.indexOf(right),
+        ),
+      );
     }
   };
 
@@ -40,12 +49,12 @@ export default function TimeSelector({ selected, onChange }: TimeSelectorProps) 
                 : "var(--text-secondary)",
             }}
           >
-            {time}
+            {formatDisplayTime(time)}
           </button>
         ))}
       </div>
       <p className="text-xs mt-1.5" style={{ color: "var(--text-muted)" }}>
-        Start with three evening time points
+        Compare daytime, evening, and late-night departures
       </p>
     </div>
   );

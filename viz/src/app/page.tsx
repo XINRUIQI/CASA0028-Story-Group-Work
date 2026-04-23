@@ -5,12 +5,14 @@ import { useRouter } from "next/navigation";
 import { Clock, ShieldCheck, Activity, HelpCircle } from "lucide-react";
 import HeroCover from "@/components/HeroCover";
 import PresetJourneys from "@/components/PresetJourneys";
-import StopPointSearch from "@/components/StopPointSearch";
 import TimeSelector from "@/components/TimeSelector";
 import DimensionCard from "@/components/DimensionCard";
+import {
+  COMPARE_TIMES,
+  FIXED_ROUTE_PRESETS,
+} from "@/lib/journeyPresets";
 import { useReveal } from "@/lib/useReveal";
 import type { ContextTag } from "@/lib/types";
-import type { StopPointMatch } from "@/lib/api";
 
 /* ── Page 1: Context checkboxes ──────────────────────────────── */
 
@@ -75,11 +77,36 @@ const DIMENSIONS = [
   },
   {
     icon: <HelpCircle size={20} style={{ color: "var(--champagne-gold)" }} />,
-    title: "Service uncertainty",
+    title: "Service uncertainty index",
     description:
-      "How predictable the service is, and whether disruptions are reported.",
+      "A percentage index that rises when alternatives thin out, headways get sparser, transfers increase, or live service status turns abnormal.",
   },
 ];
+
+const FIXED_ROUTE_OPTIONS = [
+  {
+    key: "student",
+    label: "Euston Square → Seven Sisters",
+    description: "Travelling alone",
+  },
+  {
+    key: "budget",
+    label: "Stratford → Brixton",
+    description: "Carrying bags",
+  },
+  {
+    key: "nightworker",
+    label: "King's Cross St Pancras → Barking",
+    description: "Returning late",
+  },
+  {
+    key: "unfamiliar",
+    label: "Paddington → Greenwich",
+    description: "Unfamiliar area",
+  },
+] as const;
+
+type FixedRouteOptionKey = (typeof FIXED_ROUTE_OPTIONS)[number]["key"];
 
 /* ── Silhouette SVG ──────────────────────────────────────────── */
 
@@ -153,12 +180,12 @@ export default function LandingPage() {
   const router = useRouter();
   const revealRef = useReveal();
 
-  const [origin, setOrigin] = useState<StopPointMatch | null>(null);
-  const [destination, setDestination] = useState<StopPointMatch | null>(null);
-  const [times, setTimes] = useState<string[]>(["18:00", "21:00", "22:30"]);
+  const [selectedRoute, setSelectedRoute] = useState<FixedRouteOptionKey>("student");
+  const [times, setTimes] = useState<string[]>([...COMPARE_TIMES]);
   const [contexts, setContexts] = useState<ContextTag[]>([]);
 
-  const canCompare = origin && destination && times.length >= 2;
+  const selectedJourney = FIXED_ROUTE_PRESETS[selectedRoute];
+  const canCompare = times.length >= 2;
 
   const toggleContext = (ctx: ContextTag) => {
     setContexts((prev) =>
@@ -193,19 +220,11 @@ export default function LandingPage() {
 
   const handleCompare = () => {
     if (!canCompare) return;
-    const originId =
-      origin.lat && origin.lon
-        ? `${origin.lat},${origin.lon}`
-        : origin.naptan_id;
-    const destId =
-      destination.lat && destination.lon
-        ? `${destination.lat},${destination.lon}`
-        : destination.naptan_id;
     const params = new URLSearchParams({
-      origin: originId,
-      originName: origin.name,
-      destination: destId,
-      destinationName: destination.name,
+      origin: selectedJourney.origin,
+      originName: selectedJourney.originName,
+      destination: selectedJourney.destination,
+      destinationName: selectedJourney.destinationName,
       times: times.join(","),
       contexts: contexts.join(","),
     });
@@ -313,26 +332,38 @@ export default function LandingPage() {
         </section>
 
         {/* ── OR divider ── */}
-        <div className="section-or reveal-section">or enter your own</div>
+        <div className="section-or reveal-section">or choose route and times</div>
 
-        {/* ── Custom journey input ── */}
+        {/* ── Fixed journey chooser ── */}
         <section className="reveal-section card mb-8">
           <h2 className="text-lg font-semibold mb-4">Plan your own journey</h2>
           <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
-            On the static site, only common London stations are searchable.
-            For full search, run the backend locally.
+            To keep comparisons consistent, this prototype now limits planning to the same four study routes used above.
           </p>
-          <div className="grid md:grid-cols-2 gap-4 mb-4">
-            <StopPointSearch
-              label="From"
-              placeholder="Search origin stop or station..."
-              onSelect={setOrigin}
-            />
-            <StopPointSearch
-              label="To"
-              placeholder="Search destination stop or station..."
-              onSelect={setDestination}
-            />
+          <div className="grid sm:grid-cols-2 gap-3 mb-4">
+            {FIXED_ROUTE_OPTIONS.map((route) => {
+              const preset = FIXED_ROUTE_PRESETS[route.key];
+              const active = route.key === selectedRoute;
+              return (
+                <button
+                  key={route.key}
+                  type="button"
+                  className="text-left rounded-2xl px-4 py-4 transition"
+                  onClick={() => setSelectedRoute(route.key)}
+                  style={{
+                    background: active ? "rgba(201,169,110,0.14)" : "var(--bg-secondary)",
+                    border: active
+                      ? "1px solid var(--champagne-gold)"
+                      : "1px solid rgba(201,169,110,0.12)",
+                  }}
+                >
+                  <div className="text-sm font-semibold mb-1">{preset.originName} → {preset.destinationName}</div>
+                  <div className="text-xs" style={{ color: "var(--text-muted)" }}>
+                    {route.description}
+                  </div>
+                </button>
+              );
+            })}
           </div>
           <TimeSelector selected={times} onChange={setTimes} />
         </section>
@@ -348,7 +379,7 @@ export default function LandingPage() {
           </button>
           {!canCompare && (
             <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>
-              Select origin, destination, and at least two departure times.
+              Choose one of the four routes and at least two departure times.
             </p>
           )}
         </div>

@@ -13,6 +13,8 @@ router = APIRouter(prefix="/journey", tags=["journey"])
 
 
 def _to_tfl_time(t: str) -> str:
+    if t == "24:00":
+        return "0000"
     return t.replace(":", "")
 
 
@@ -85,7 +87,7 @@ _ROUTE_PARAMS_BASE = {
 async def plan_journey(
     origin: str = Query(..., description="Origin (lat,lon or NaPTAN ID)"),
     destination: str = Query(..., description="Destination (lat,lon or NaPTAN ID)"),
-    time: str = Query("18:00", description="Departure time HH:MM"),
+    time: str = Query("19:00", description="Departure time HH:MM"),
     date: str = Query("", description="Date YYYYMMDD, defaults to today"),
 ):
     """Call TfL Journey Planner for a single departure time."""
@@ -110,7 +112,7 @@ async def compare_journey(
     origin: str = Query(...),
     destination: str = Query(...),
     times: str = Query(
-        "09:00,18:00,21:00,23:30",
+        "14:00,19:00,00:00",
         description="Comma-separated departure times",
     ),
     date: str = Query(""),
