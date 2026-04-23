@@ -1,0 +1,460 @@
+{
+  "layerMeta": {
+    "dependence": {
+      "label": "Night-time dependence",
+      "accent": "var(--accent-blue)",
+      "description": "Higher scores indicate places where after-dark activity remains present but baseline support is comparatively thin, so the night network matters more."
+    },
+    "burden": {
+      "label": "Night burden",
+      "accent": "var(--accent-rose)",
+      "description": "Higher scores indicate a heavier after-dark burden once limited support and recent supply contraction are combined."
+    },
+    "mismatch": {
+      "label": "Dependence-support mismatch",
+      "accent": "var(--accent-amber)",
+      "description": "Higher scores indicate boroughs where late-night dependence is stronger than the support currently on offer."
+    }
+  },
+  "boroughs": {
+    "Barking and Dagenham": {
+      "bucket": "Outer",
+      "activity_index": 0.0007,
+      "support_index": 0.0,
+      "supply_change": 0.1404,
+      "dependence": 0.35,
+      "support_score": 0.25,
+      "burden": 0.53,
+      "mismatch": 0.1
+    },
+    "Barnet": {
+      "bucket": "Outer",
+      "activity_index": 0.0074,
+      "support_index": 0.0943,
+      "supply_change": 0.0988,
+      "dependence": 0.3183,
+      "support_score": 0.3319,
+      "burden": 0.4757,
+      "mismatch": 0.0
+    },
+    "Bexley": {
+      "bucket": "Outer",
+      "activity_index": 0.0167,
+      "support_index": 0.0859,
+      "supply_change": 0.3409,
+      "dependence": 0.3307,
+      "support_score": 0.3246,
+      "burden": 0.4858,
+      "mismatch": 0.0061
+    },
+    "Brent": {
+      "bucket": "Outer",
+      "activity_index": 0.0074,
+      "support_index": 0.0885,
+      "supply_change": 0.3104,
+      "dependence": 0.3206,
+      "support_score": 0.3269,
+      "burden": 0.4792,
+      "mismatch": 0.0
+    },
+    "Bromley": {
+      "bucket": "Outer",
+      "activity_index": 0.0095,
+      "support_index": 0.1171,
+      "supply_change": 0.326,
+      "dependence": 0.311,
+      "support_score": 0.3517,
+      "burden": 0.4628,
+      "mismatch": 0.0
+    },
+    "Camden": {
+      "bucket": "Inner",
+      "activity_index": 0.0483,
+      "support_index": 0.2398,
+      "supply_change": 0.2122,
+      "dependence": 0.2988,
+      "support_score": 0.4582,
+      "burden": 0.4082,
+      "mismatch": 0.0
+    },
+    "City of London": {
+      "bucket": "Inner",
+      "activity_index": 0.6725,
+      "support_index": 0.1877,
+      "supply_change": 0.8705,
+      "dependence": 0.9239,
+      "support_score": 0.413,
+      "burden": 0.7723,
+      "mismatch": 0.5109
+    },
+    "Croydon": {
+      "bucket": "Outer",
+      "activity_index": 0.0058,
+      "support_index": 0.1463,
+      "supply_change": 0.1777,
+      "dependence": 0.2957,
+      "support_score": 0.377,
+      "burden": 0.443,
+      "mismatch": 0.0
+    },
+    "Ealing": {
+      "bucket": "Outer",
+      "activity_index": 0.0109,
+      "support_index": 0.114,
+      "supply_change": 0.2125,
+      "dependence": 0.3136,
+      "support_score": 0.349,
+      "burden": 0.4654,
+      "mismatch": 0.0
+    },
+    "Enfield": {
+      "bucket": "Outer",
+      "activity_index": 0.0094,
+      "support_index": 0.0739,
+      "supply_change": 0.2358,
+      "dependence": 0.3284,
+      "support_score": 0.3142,
+      "burden": 0.4892,
+      "mismatch": 0.0142
+    },
+    "Greenwich": {
+      "bucket": "Inner",
+      "activity_index": 0.0059,
+      "support_index": 0.0675,
+      "supply_change": 0.6401,
+      "dependence": 0.3277,
+      "support_score": 0.3086,
+      "burden": 0.4913,
+      "mismatch": 0.019
+    },
+    "Hackney": {
+      "bucket": "Inner",
+      "activity_index": 0.032,
+      "support_index": 0.1153,
+      "supply_change": 1.7217,
+      "dependence": 0.3336,
+      "support_score": 0.3501,
+      "burden": 0.4759,
+      "mismatch": 0.0
+    },
+    "Hammersmith and Fulham": {
+      "bucket": "Inner",
+      "activity_index": 0.0157,
+      "support_index": 0.1106,
+      "supply_change": 0.3017,
+      "dependence": 0.3197,
+      "support_score": 0.3461,
+      "burden": 0.4701,
+      "mismatch": 0.0
+    },
+    "Haringey": {
+      "bucket": "Outer",
+      "activity_index": 0.006,
+      "support_index": 0.0514,
+      "supply_change": 0.4327,
+      "dependence": 0.3343,
+      "support_score": 0.2947,
+      "burden": 0.5013,
+      "mismatch": 0.0397
+    },
+    "Harrow": {
+      "bucket": "Outer",
+      "activity_index": 0.0057,
+      "support_index": 0.0453,
+      "supply_change": 0.2179,
+      "dependence": 0.3365,
+      "support_score": 0.2893,
+      "burden": 0.5049,
+      "mismatch": 0.0472
+    },
+    "Havering": {
+      "bucket": "Outer",
+      "activity_index": 0.0094,
+      "support_index": 0.094,
+      "supply_change": 0.5296,
+      "dependence": 0.3203,
+      "support_score": 0.3316,
+      "burden": 0.4769,
+      "mismatch": 0.0
+    },
+    "Hillingdon": {
+      "bucket": "Outer",
+      "activity_index": 0.0128,
+      "support_index": 0.1082,
+      "supply_change": 0.3737,
+      "dependence": 0.3178,
+      "support_score": 0.344,
+      "burden": 0.47,
+      "mismatch": 0.0
+    },
+    "Hounslow": {
+      "bucket": "Outer",
+      "activity_index": 0.0122,
+      "support_index": 0.099,
+      "supply_change": 0.3089,
+      "dependence": 0.321,
+      "support_score": 0.3359,
+      "burden": 0.4754,
+      "mismatch": 0.0
+    },
+    "Islington": {
+      "bucket": "Inner",
+      "activity_index": 0.038,
+      "support_index": 0.1209,
+      "supply_change": 0.3216,
+      "dependence": 0.3371,
+      "support_score": 0.355,
+      "burden": 0.4756,
+      "mismatch": 0.0
+    },
+    "Kensington and Chelsea": {
+      "bucket": "Inner",
+      "activity_index": 0.0236,
+      "support_index": 0.162,
+      "supply_change": 0.0119,
+      "dependence": 0.3064,
+      "support_score": 0.3907,
+      "burden": 0.4427,
+      "mismatch": 0.0
+    },
+    "Kingston upon Thames": {
+      "bucket": "Outer",
+      "activity_index": 0.0133,
+      "support_index": 0.0328,
+      "supply_change": 0.1913,
+      "dependence": 0.3489,
+      "support_score": 0.2785,
+      "burden": 0.5166,
+      "mismatch": 0.0704
+    },
+    "Lambeth": {
+      "bucket": "Inner",
+      "activity_index": 0.0272,
+      "support_index": 0.1155,
+      "supply_change": 0.4606,
+      "dependence": 0.3288,
+      "support_score": 0.3503,
+      "burden": 0.4732,
+      "mismatch": 0.0
+    },
+    "Lewisham": {
+      "bucket": "Inner",
+      "activity_index": 0.0094,
+      "support_index": 0.0621,
+      "supply_change": 0.5424,
+      "dependence": 0.3333,
+      "support_score": 0.3039,
+      "burden": 0.4965,
+      "mismatch": 0.0293
+    },
+    "Merton": {
+      "bucket": "Outer",
+      "activity_index": 0.0058,
+      "support_index": 0.0339,
+      "supply_change": 0.3682,
+      "dependence": 0.3412,
+      "support_score": 0.2794,
+      "burden": 0.5119,
+      "mismatch": 0.0617
+    },
+    "Newham": {
+      "bucket": "Inner",
+      "activity_index": 0.0053,
+      "support_index": 0.0353,
+      "supply_change": 1.1394,
+      "dependence": 0.3401,
+      "support_score": 0.2807,
+      "burden": 0.5108,
+      "mismatch": 0.0595
+    },
+    "Redbridge": {
+      "bucket": "Outer",
+      "activity_index": 0.007,
+      "support_index": 0.0385,
+      "supply_change": 0.44,
+      "dependence": 0.3405,
+      "support_score": 0.2834,
+      "burden": 0.5097,
+      "mismatch": 0.0571
+    },
+    "Richmond upon Thames": {
+      "bucket": "Outer",
+      "activity_index": 0.0286,
+      "support_index": 0.0843,
+      "supply_change": 0.1914,
+      "dependence": 0.3429,
+      "support_score": 0.3232,
+      "burden": 0.4931,
+      "mismatch": 0.0197
+    },
+    "Southwark": {
+      "bucket": "Inner",
+      "activity_index": 0.0253,
+      "support_index": 0.1147,
+      "supply_change": 0.512,
+      "dependence": 0.3273,
+      "support_score": 0.3496,
+      "burden": 0.4727,
+      "mismatch": 0.0
+    },
+    "Sutton": {
+      "bucket": "Outer",
+      "activity_index": 0.0104,
+      "support_index": 0.0236,
+      "supply_change": 0.5405,
+      "dependence": 0.3498,
+      "support_score": 0.2705,
+      "burden": 0.5207,
+      "mismatch": 0.0793
+    },
+    "Tower Hamlets": {
+      "bucket": "Inner",
+      "activity_index": 0.0192,
+      "support_index": 0.0962,
+      "supply_change": 0.9214,
+      "dependence": 0.3289,
+      "support_score": 0.3336,
+      "burden": 0.4808,
+      "mismatch": 0.0
+    },
+    "Waltham Forest": {
+      "bucket": "Outer",
+      "activity_index": 0.007,
+      "support_index": 0.0652,
+      "supply_change": 0.5513,
+      "dependence": 0.3297,
+      "support_score": 0.3066,
+      "burden": 0.4933,
+      "mismatch": 0.0231
+    },
+    "Wandsworth": {
+      "bucket": "Inner",
+      "activity_index": 0.0135,
+      "support_index": 0.1398,
+      "supply_change": 0.2905,
+      "dependence": 0.3057,
+      "support_score": 0.3715,
+      "burden": 0.451,
+      "mismatch": 0.0
+    },
+    "Westminster": {
+      "bucket": "Inner",
+      "activity_index": 0.1098,
+      "support_index": 0.8636,
+      "supply_change": 0.0818,
+      "dependence": 0.1056,
+      "support_score": 1.0,
+      "burden": 0.0581,
+      "mismatch": 0.0
+    }
+  },
+  "audienceShift": [
+    {
+      "dimension": "Gender",
+      "category": "Male",
+      "label": "Male",
+      "day_share": 0.43,
+      "night_share": 0.64,
+      "delta": 0.21
+    },
+    {
+      "dimension": "Gender",
+      "category": "Female",
+      "label": "Female",
+      "day_share": 0.57,
+      "night_share": 0.36,
+      "delta": -0.21
+    },
+    {
+      "dimension": "Ethnicity",
+      "category": "White other",
+      "label": "Ethnicity: White other",
+      "day_share": 0.21,
+      "night_share": 0.34,
+      "delta": 0.13
+    },
+    {
+      "dimension": "Age",
+      "category": "20-24",
+      "label": "Age: 20-24",
+      "day_share": 0.12,
+      "night_share": 0.24,
+      "delta": 0.12
+    },
+    {
+      "dimension": "Age",
+      "category": "25-34",
+      "label": "Age: 25-34",
+      "day_share": 0.26,
+      "night_share": 0.38,
+      "delta": 0.12
+    },
+    {
+      "dimension": "Ethnicity",
+      "category": "White British/Iish",
+      "label": "Ethnicity: White British/Iish",
+      "day_share": 0.32,
+      "night_share": 0.21,
+      "delta": -0.11
+    }
+  ],
+  "innerOuter": [
+    {
+      "metric": "dependence",
+      "label": "Dependence",
+      "inner": 0.3512,
+      "outer": 0.329
+    },
+    {
+      "metric": "support_score",
+      "label": "Support",
+      "inner": 0.4008,
+      "outer": 0.3138
+    },
+    {
+      "metric": "burden",
+      "label": "Burden",
+      "inner": 0.4628,
+      "outer": 0.4897
+    },
+    {
+      "metric": "mismatch",
+      "label": "Mismatch",
+      "inner": 0.0442,
+      "outer": 0.0273
+    }
+  ],
+  "commuteSnapshot": {
+    "outer_to_outer": 0.2684,
+    "outer_to_inner": 0.1764,
+    "inner_to_inner": 0.3076,
+    "narrative": "At night, outer-London residents are more likely to stay within outer London than travel into the centre, while inner-London residents still concentrate heavily inward."
+  },
+  "highlights": [
+    {
+      "title": "Highest night burden",
+      "value": "City of London",
+      "detail": "Composite burden score 77/100"
+    },
+    {
+      "title": "Largest mismatch",
+      "value": "City of London",
+      "detail": "Dependence exceeds support by 51 points"
+    },
+    {
+      "title": "Outer vs inner",
+      "value": "+3 burden pts",
+      "detail": "Outer boroughs also score -9 support pts relative to inner boroughs"
+    },
+    {
+      "title": "Night-user shift",
+      "value": "Male",
+      "detail": "Night share moves +21 percentage points relative to daytime bus use; outer-to-outer night commuting is 27%."
+    }
+  ],
+  "method": [
+    "Dependence combines borough-level night activity with thin baseline support.",
+    "Support blends current support intensity with recent borough-level supply change.",
+    "Burden and mismatch are comparative indices for explanation, not causal proof."
+  ]
+}

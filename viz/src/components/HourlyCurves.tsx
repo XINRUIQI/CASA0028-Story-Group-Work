@@ -48,6 +48,18 @@ const METRICS: {
   { key: "safety", label: "Safety", unit: "%", color: "var(--accent-blue)", highlightKey: "safety" },
 ];
 
+async function loadStaticHourlyCurves(origin: string, destination: string) {
+  const encodedTimes = HOURLY_TIMES.join(",").replace(/:/g, "-").replace(/,/g, "_");
+  const path = `/static-data/compare-hourly/${destination}__${origin}__${encodedTimes}.json`;
+  try {
+    const response = await fetch(path);
+    if (!response.ok) return null;
+    return (await response.json()) as CompareHourlyResult;
+  } catch {
+    return null;
+  }
+}
+
 function formatHourLabel(time: string): string {
   return time === "24:00" ? "24" : time.slice(0, 2);
 }
@@ -109,23 +121,58 @@ export default function HourlyCurves({
   highlightMetrics = [],
 }: HourlyCurvesProps) {
   const [curves, setCurves] = useState<Record<string, HourlyPoint | null>>({});
-  const [fetchedFor, setFetchedFor] = useState<string>("");
-  const loading = !!(origin && destination) && `${origin}|${destination}` !== fetchedFor;
+  const [resolvedKey, setResolvedKey] = useState("");
+  const requestKey = origin && destination ? `${origin}|${destination}` : "";
+  const loading = !!requestKey && requestKey !== resolvedKey;
+
+  function mergeCurveSources(
+    live: CompareHourlyResult | null,
+    fallback: CompareHourlyResult | null,
+  ): Record<string, HourlyPoint | null> {
+    const source: CompareHourlyResult["curves"] = {};
+
+    for (const time of HOURLY_TIMES) {
+      source[time] = live?.curves?.[time] ?? fallback?.curves?.[time] ?? null;
+    }
+
+    return buildHourlyCurves(source);
+  }
 
   useEffect(() => {
     if (!origin || !destination) return;
     let stale = false;
-    const key = `${origin}|${destination}`;
-    api
-      .compareHourly(origin, destination, [...HOURLY_TIMES])
-      .then((res) => {
+
+    loadStaticHourlyCurves(origin, destination)
+      .then((fallback) => {
         if (stale) return;
-        setCurves(buildHourlyCurves(res.curves));
-        setFetchedFor(key);
+
+        if (fallback) {
+          setCurves(buildHourlyCurves(fallback.curves));
+          setResolvedKey(requestKey);
+        }
+
+        return api.compareHourly(origin, destination, [...HOURLY_TIMES])
+          .then((live) => {
+            if (stale) return;
+            setCurves(mergeCurveSources(live, fallback));
+            setResolvedKey(requestKey);
+          })
+          .catch(() => {
+            if (!stale && !fallback) {
+              setCurves({});
+              setResolvedKey(requestKey);
+            }
+          });
       })
-      .catch(() => { if (!stale) { setCurves({}); setFetchedFor(key); } });
+      .catch(() => {
+        if (!stale) {
+          setCurves({});
+          setResolvedKey(requestKey);
+        }
+      });
+
     return () => { stale = true; };
-  }, [origin, destination]);
+  }, [origin, destination, requestKey]);
 
   if (loading) {
     return (

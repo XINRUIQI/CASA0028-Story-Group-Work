@@ -35,6 +35,7 @@ STEPS = [
     "08_naptan_stops.py",
     "09_city_overview.py",
     "10_fairness_grid.py",
+    "11_fairness_explainability.py",
 ]
 
 

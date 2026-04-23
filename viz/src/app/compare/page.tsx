@@ -65,6 +65,49 @@ const TIME_COLORS = [
   "var(--accent-emerald)",
 ];
 
+const DENSE_COMPARE_FALLBACK_TIMES = [
+  "18:00",
+  "19:00",
+  "20:00",
+  "21:00",
+  "22:00",
+  "23:00",
+  "00:00",
+  "01:00",
+  "02:00",
+] as const;
+
+const METRIC_GUIDE_ITEMS = [
+  {
+    label: "Total time",
+    description: "End-to-end journey duration, including in-vehicle time, transfer time, and explicit walking where TfL returns it.",
+  },
+  {
+    label: "Walking (est.)",
+    description: "Approximate interchange walking. If TfL omits a dedicated walk leg, this is inferred from interchange duration rather than measured pavement distance.",
+  },
+  {
+    label: "Waiting burden",
+    description: "Expected waiting accumulated across the journey, based on line headways and transfer points. It is not a live countdown.",
+  },
+  {
+    label: "Support nearby",
+    description: "Open support places near the route and stops, such as shops, pharmacies, toilets, AEDs, and station facilities that remain usable after dark.",
+  },
+  {
+    label: "Activity context",
+    description: "A proxy for whether people and venues are still around. It uses late-night economy and venue density, not real-time crowd sensing.",
+  },
+  {
+    label: "Safety exposure",
+    description: "A corridor-level proxy derived from night safety context and visibility indicators. It is not a personal danger prediction.",
+  },
+  {
+    label: "Service uncertainty index",
+    description: "A composite proxy from headway gaps, transfer complexity, fallback options, and live disruption signals. Higher values mean the trip is less dependable.",
+  },
+];
+
 function mapThemeForTime(time: string): "day" | "evening" | "night" {
   const hour = Number(time.split(":")[0] || 0);
   if (hour < 20) return "day";
@@ -124,6 +167,29 @@ async function loadStaticCompareCards(
   }
 }
 
+function mergeCompareCards(
+  requestedTimes: string[],
+  primary: CompareCardsResult | null,
+  fallbacks: Array<CompareCardsResult | null>,
+): CompareCardsResult | null {
+  const sources = [primary, ...fallbacks].filter(Boolean) as CompareCardsResult[];
+  if (sources.length === 0) return null;
+
+  const options = Object.fromEntries(
+    requestedTimes.map((time) => {
+      const matched = sources.find((source) => source.options[time]);
+      return [time, matched?.options[time] ?? null];
+    }),
+  );
+
+  return {
+    origin: primary?.origin ?? sources[0].origin,
+    destination: primary?.destination ?? sources[0].destination,
+    options,
+    note: primary?.note ?? sources[0].note,
+  };
+}
+
 function deriveCompareResult(
   origin: string,
   destination: string,
@@ -140,48 +206,92 @@ function deriveCompareResult(
 }
 
 const DEFAULT_ORIGIN = FIXED_ROUTE_PRESETS.student.origin;
-const DEFAULT_ORIGIN_NAME = FIXED_ROUTE_PRESETS.student.originName;
 const DEFAULT_DEST = FIXED_ROUTE_PRESETS.student.destination;
-const DEFAULT_DEST_NAME = FIXED_ROUTE_PRESETS.student.destinationName;
+
+function getPresetPersona(
+  origin?: string | null,
+  destination?: string | null,
+): PersonaId {
+  for (const personaId of Object.keys(FIXED_ROUTE_PRESETS) as PersonaId[]) {
+    const preset = FIXED_ROUTE_PRESETS[personaId];
+    if (preset.origin === origin && preset.destination === destination) {
+      return personaId;
+    }
+  }
+  return "student";
+}
 
 function CompareContent() {
   const searchParams = useSearchParams();
-  const origin = searchParams.get("origin") || DEFAULT_ORIGIN;
-  const originName = searchParams.get("originName") || (searchParams.get("origin") ? searchParams.get("origin")! : DEFAULT_ORIGIN_NAME);
-  const destination = searchParams.get("destination") || DEFAULT_DEST;
-  const destinationName = searchParams.get("destinationName") || (searchParams.get("destination") ? searchParams.get("destination")! : DEFAULT_DEST_NAME);
+  const queryOrigin = searchParams.get("origin") || DEFAULT_ORIGIN;
+  const queryDestination = searchParams.get("destination") || DEFAULT_DEST;
   const timesParam = searchParams.get("times") || encodeCompareTimes(COMPARE_TIMES);
   const contextsParam = searchParams.get("contexts") || "";
 
   const times = timesParam.split(",").filter(Boolean);
   const contexts = contextsParam.split(",").filter(Boolean) as ContextTag[];
   const [priorities, setPriorities] = useState<Priority[]>([]);
-  const [persona, setPersona] = useState<PersonaId>("student");
+  const [persona, setPersona] = useState<PersonaId>(() =>
+    getPresetPersona(queryOrigin, queryDestination),
+  );
 
   const [data, setData] = useState<CompareResult | null>(null);
   const [cardsData, setCardsData] = useState<CompareCardsResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedTime, setSelectedTime] = useState<string>(times[0] || "");
+  const [showMetricGuide, setShowMetricGuide] = useState(false);
 
   const revealRef = useReveal();
+
+  useEffect(() => {
+    setPersona(getPresetPersona(queryOrigin, queryDestination));
+  }, [queryDestination, queryOrigin]);
+
+  const activePreset = FIXED_ROUTE_PRESETS[persona];
+  const origin = activePreset.origin;
+  const originName = activePreset.originName;
+  const destination = activePreset.destination;
+  const destinationName = activePreset.destinationName;
 
   useEffect(() => {
     if (!origin || !destination) return;
     setLoading(true);
     setError("");
 
-    api.compareCards(origin, destination, times)
-      .catch(() => loadStaticCompareCards(origin, destination, times))
-      .then((cards) => {
-        if (!cards) {
-          throw new Error("Could not load comparison data for this journey.");
+    Promise.all([
+      loadStaticCompareCards(origin, destination, times),
+      loadStaticCompareCards(origin, destination, [...DENSE_COMPARE_FALLBACK_TIMES]),
+    ])
+      .then(([staticCards, denseCards]) => {
+        const staticMerged = mergeCompareCards(times, staticCards, [denseCards]);
+
+        if (staticMerged) {
+          setCardsData(staticMerged);
+          setData(deriveCompareResult(origin, destination, times, staticMerged));
+          setLoading(false);
         }
-        setCardsData(cards);
-        setData(deriveCompareResult(origin, destination, times, cards));
+
+        return api.compareCards(origin, destination, times)
+          .then((liveCards) => {
+            const merged = mergeCompareCards(times, liveCards, [staticCards, denseCards]);
+            if (!merged) {
+              throw new Error("Could not load comparison data for this journey.");
+            }
+            setCardsData(merged);
+            setData(deriveCompareResult(origin, destination, times, merged));
+            setLoading(false);
+          })
+          .catch(() => {
+            if (!staticMerged) {
+              throw new Error("Could not load comparison data for this journey.");
+            }
+          });
       })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+      .catch((e) => {
+        setError(e.message);
+        setLoading(false);
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [origin, destination, timesParam]);
 
@@ -232,7 +342,16 @@ function CompareContent() {
 
       {/* ── Hourly curves ── */}
       <section className="reveal-section card mb-8">
-        <h2 className="text-lg font-semibold mb-2">Hourly Curves of Extra Journey Burdens</h2>
+        <div className="flex items-start justify-between gap-3 mb-2 flex-wrap">
+          <h2 className="text-lg font-semibold">Hourly Curves of Extra Journey Burdens</h2>
+          <button
+            type="button"
+            className="btn-secondary px-3 py-2 text-xs"
+            onClick={() => setShowMetricGuide(true)}
+          >
+            What do these metrics mean?
+          </button>
+        </div>
         <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>
           Eight departure times, five dimensions. These curves trace how total time,
           waiting, support nearby, service uncertainty, and safety shift from 06 to 03.
@@ -269,6 +388,50 @@ function CompareContent() {
       </section>
 
       {/* ── Priority selector ── */}
+
+            {showMetricGuide && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center px-4"
+                style={{ background: "rgba(8, 10, 18, 0.78)" }}
+                onClick={() => setShowMetricGuide(false)}
+              >
+                <div
+                  className="card w-full max-w-2xl max-h-[80vh] overflow-y-auto"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <div className="flex items-start justify-between gap-4 mb-4">
+                    <div>
+                      <h3 className="text-lg font-semibold mb-1">Compare metric guide</h3>
+                      <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                        These indicators are proxies for late-night journey burdens. They help compare routes, not produce a single final score.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-secondary px-3 py-2 text-xs"
+                      onClick={() => setShowMetricGuide(false)}
+                    >
+                      Close
+                    </button>
+                  </div>
+
+                  <div className="grid gap-3">
+                    {METRIC_GUIDE_ITEMS.map((item) => (
+                      <div
+                        key={item.label}
+                        className="rounded-xl px-4 py-3"
+                        style={{ background: "var(--bg-secondary)", border: "1px solid var(--border-subtle)" }}
+                      >
+                        <div className="text-sm font-semibold mb-1">{item.label}</div>
+                        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                          {item.description}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
       <section className="reveal-section card mb-8">
         <h2 className="font-semibold mb-2">What matters most tonight?</h2>
         <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
