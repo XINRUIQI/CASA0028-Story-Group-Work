@@ -99,6 +99,22 @@ function buildRouteSupportSummary(
   return parts.length > 0 ? parts.join(" · ") : undefined;
 }
 
+async function loadStaticCompareCards(
+  origin: string,
+  destination: string,
+  times: string[],
+): Promise<CompareCardsResult | null> {
+  const encodedTimes = times.join(",").replace(/:/g, "-").replace(/,/g, "_");
+  const path = `/static-data/compare-cards/${destination}__${origin}__${encodedTimes}.json`;
+  try {
+    const response = await fetch(path);
+    if (!response.ok) return null;
+    return (await response.json()) as CompareCardsResult;
+  } catch {
+    return null;
+  }
+}
+
 const DEFAULT_ORIGIN = "940GZZLUESQ";
 const DEFAULT_ORIGIN_NAME = "Euston Square";
 const DEFAULT_DEST = "HUBSVS";
@@ -133,7 +149,9 @@ function CompareContent() {
 
     Promise.all([
       api.compareJourney(origin, destination, times),
-      api.compareCards(origin, destination, times).catch(() => null),
+      api.compareCards(origin, destination, times).catch(() =>
+        loadStaticCompareCards(origin, destination, times),
+      ),
     ])
       .then(([compare, cards]) => {
         setData(compare);
@@ -307,6 +325,7 @@ function CompareContent() {
                   time={time}
                   index={i}
                   journey={data.options[time]}
+                  cards={cardsData?.options[time]?.cards}
                   origin={origin}
                   destination={destination}
                   highlighted={highlightedMetrics}

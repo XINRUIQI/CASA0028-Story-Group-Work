@@ -1,6 +1,6 @@
 "use client";
 
-import { Journey } from "@/lib/api";
+import { CardData, Journey } from "@/lib/api";
 import {
   Clock,
   Footprints,
@@ -17,6 +17,7 @@ interface OptionCardProps {
   time: string;
   index: number;
   journey: Journey | null;
+  cards?: Record<string, CardData>;
   origin: string;
   destination: string;
   highlighted?: string[];
@@ -28,6 +29,7 @@ export default function OptionCard({
   time,
   index,
   journey,
+  cards,
   origin,
   destination,
   highlighted = [],
@@ -44,6 +46,35 @@ export default function OptionCard({
       </div>
     );
   }
+
+  const waitingCard = cards?.waiting_burden as {
+    total_expected_wait_min?: number;
+  } | undefined;
+  const supportCard = cards?.support_access as {
+    total_support_open?: number;
+    route_support_index?: number;
+  } | undefined;
+  const activityCard = cards?.activity_context as {
+    route_activity_index?: number;
+  } | undefined;
+  const uncertaintyCard = cards?.service_uncertainty as {
+    disruption_count?: number;
+  } | undefined;
+
+  const waitingText = waitingCard?.total_expected_wait_min != null
+    ? `~${Number(waitingCard.total_expected_wait_min).toFixed(1).replace(/\.0$/, "")} min`
+    : "—";
+  const supportText = supportCard?.total_support_open != null
+    ? `${Number(supportCard.total_support_open)} open`
+    : supportCard?.route_support_index != null
+      ? `Index ${Number(supportCard.route_support_index).toFixed(2)}`
+      : "—";
+  const activityText = activityCard?.route_activity_index != null
+    ? `Index ${Number(activityCard.route_activity_index).toFixed(2)}`
+    : "—";
+  const uncertaintyText = uncertaintyCard?.disruption_count != null
+    ? `${Number(uncertaintyCard.disruption_count)} disruption${Number(uncertaintyCard.disruption_count) === 1 ? "" : "s"}`
+    : "—";
 
   const metrics = [
     {
@@ -74,25 +105,25 @@ export default function OptionCard({
       key: "waiting",
       icon: <Timer size={14} />,
       label: "Waiting burden",
-      value: "—",
+      value: waitingText,
     },
     {
       key: "support",
       icon: <ShieldCheck size={14} />,
       label: "Support nearby",
-      value: "—",
+      value: supportText,
     },
     {
       key: "activity",
       icon: <Activity size={14} />,
       label: "Activity context",
-      value: "—",
+      value: activityText,
     },
     {
       key: "uncertainty",
       icon: <HelpCircle size={14} />,
       label: "Service uncertainty",
-      value: "—",
+      value: uncertaintyText,
     },
   ];
 
