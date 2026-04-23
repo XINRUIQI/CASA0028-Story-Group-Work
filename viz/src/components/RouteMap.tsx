@@ -17,6 +17,51 @@ const MAP_STYLES: Record<RouteMapTheme, string> = {
   night: "mapbox://styles/mapbox/navigation-night-v1",
 };
 
+const SIMPLE_BASEMAP_HIDDEN_LAYERS = [
+  /road/i,
+  /bridge/i,
+  /tunnel/i,
+  /street/i,
+  /traffic/i,
+  /poi/i,
+  /transit/i,
+  /building/i,
+  /park/i,
+  /landuse/i,
+  /landcover/i,
+  /hillshade/i,
+  /contour/i,
+  /path/i,
+  /pedestrian/i,
+  /rail/i,
+  /airport/i,
+];
+
+const SIMPLE_BASEMAP_KEEP_LAYERS = [
+  /background/i,
+  /water/i,
+  /place-label/i,
+  /settlement/i,
+  /country-label/i,
+  /state-label/i,
+  /admin/i,
+];
+
+function simplifyBasemap(map: mapboxgl.Map) {
+  const style = map.getStyle();
+  const layers = style.layers || [];
+
+  layers.forEach((layer) => {
+    const layerId = layer.id;
+    if (SIMPLE_BASEMAP_KEEP_LAYERS.some((pattern) => pattern.test(layerId))) {
+      return;
+    }
+    if (SIMPLE_BASEMAP_HIDDEN_LAYERS.some((pattern) => pattern.test(layerId))) {
+      map.setLayoutProperty(layerId, "visibility", "none");
+    }
+  });
+}
+
 function parseLineStringPath(path: string): [number, number][] | null {
   if (!path.trim().startsWith("[[")) return null;
 
@@ -104,6 +149,8 @@ export default function RouteMap({
     mapRef.current = map;
 
     map.on("load", () => {
+      simplifyBasemap(map);
+
       const allCoords: [number, number][] = [];
 
       legs.forEach((leg, i) => {
