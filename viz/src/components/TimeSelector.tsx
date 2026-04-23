@@ -5,8 +5,7 @@ import {
   formatDisplayTime,
 } from "@/lib/journeyPresets";
 
-const PRESET_TIMES = [...COMPARE_TIMES];
-
+const PRESET_TIMES: readonly string[] = [...COMPARE_TIMES];
 interface TimeSelectorProps {
   selected: string[];
   onChange: (times: string[]) => void;
