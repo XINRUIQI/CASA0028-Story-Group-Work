@@ -56,6 +56,49 @@ const TIME_COLORS = [
   "var(--accent-emerald)",
 ];
 
+function mapThemeForTime(time: string): "day" | "evening" | "night" {
+  const hour = Number(time.split(":")[0] || 0);
+  if (hour < 20) return "day";
+  if (hour < 22) return "evening";
+  return "night";
+}
+
+function formatSignedMetric(value: unknown): string | null {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return null;
+  return `${numeric >= 0 ? "+" : ""}${numeric.toFixed(2)}`;
+}
+
+function buildRouteSupportSummary(
+  supportCard?: CardData,
+  activityCard?: CardData,
+): string | undefined {
+  if (!supportCard && !activityCard) return undefined;
+
+  const parts: string[] = [];
+  const supportCount = Number(supportCard?.total_support_open);
+  if (Number.isFinite(supportCount)) {
+    parts.push(`${supportCount} open support places`);
+  }
+
+  const supportIndex = formatSignedMetric(supportCard?.route_support_index);
+  if (supportIndex) {
+    parts.push(`support ${supportIndex}`);
+  }
+
+  const activityIndex = formatSignedMetric(activityCard?.route_activity_index);
+  if (activityIndex) {
+    parts.push(`activity ${activityIndex}`);
+  }
+
+  const venueDensity = Number(activityCard?.route_venue_density);
+  if (Number.isFinite(venueDensity)) {
+    parts.push(`${venueDensity.toFixed(1)} venues/km²`);
+  }
+
+  return parts.length > 0 ? parts.join(" · ") : undefined;
+}
+
 const DEFAULT_ORIGIN = "940GZZLUESQ";
 const DEFAULT_ORIGIN_NAME = "Euston Square";
 const DEFAULT_DEST = "HUBSVS";
@@ -211,7 +254,9 @@ function CompareContent() {
               {times.map((t, i) => {
                 const j = data.options[t];
                 if (!j) return null;
-                const supportOpen = cardsData?.options[t]?.cards?.support_access?.total_support_open;
+                const supportCard = cardsData?.options[t]?.cards?.support_access;
+                const activityCard = cardsData?.options[t]?.cards?.activity_context;
+                const supportOpen = supportCard?.total_support_open;
                 return (
                   <RouteMap
                     key={t}
@@ -219,6 +264,8 @@ function CompareContent() {
                     label={TIME_LABELS[t] || t}
                     accent={TIME_COLORS[i % TIME_COLORS.length]}
                     supportCount={supportOpen != null ? Number(supportOpen) : undefined}
+                    supportSummary={buildRouteSupportSummary(supportCard, activityCard)}
+                    theme={mapThemeForTime(t)}
                   />
                 );
               })}

@@ -5,7 +5,17 @@ import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import type { Leg } from "@/lib/api";
 
-const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
+const MAPBOX_TOKEN =
+  process.env.NEXT_PUBLIC_MAPBOX_TOKEN ||
+  "pk.eyJ1IjoibGV2aW5lbGl1IiwiYSI6ImNta21vc3doOTBleGYza3IycDNsOXRidXQifQ.SdtOnvfZEml6QGLmnnduDQ";
+
+type RouteMapTheme = "day" | "evening" | "night";
+
+const MAP_STYLES: Record<RouteMapTheme, string> = {
+  day: "mapbox://styles/mapbox/light-v11",
+  evening: "mapbox://styles/mapbox/streets-v12",
+  night: "mapbox://styles/mapbox/dark-v11",
+};
 
 function decodePolyline(encoded: string): [number, number][] {
   const coords: [number, number][] = [];
@@ -48,6 +58,8 @@ interface RouteMapProps {
   label: string;
   accent?: string;
   supportCount?: number;
+  supportSummary?: string;
+  theme?: RouteMapTheme;
 }
 
 export default function RouteMap({
@@ -55,6 +67,8 @@ export default function RouteMap({
   label,
   accent = "var(--champagne-gold)",
   supportCount,
+  supportSummary,
+  theme = "evening",
 }: RouteMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -65,7 +79,7 @@ export default function RouteMap({
     mapboxgl.accessToken = MAPBOX_TOKEN;
     const map = new mapboxgl.Map({
       container: containerRef.current,
-      style: "mapbox://styles/mapbox/dark-v11",
+      style: MAP_STYLES[theme],
       center: [-0.118, 51.509],
       zoom: 11,
       interactive: false,
@@ -150,7 +164,7 @@ export default function RouteMap({
     });
 
     return () => { map.remove(); };
-  }, [legs]);
+  }, [legs, theme]);
 
   if (!MAPBOX_TOKEN) {
     return (
@@ -165,9 +179,9 @@ export default function RouteMap({
             </p>
           )}
         </div>
-        {supportCount != null && (
+        {(supportSummary || supportCount != null) && (
           <div className="route-map-support">
-            {supportCount} support points nearby
+            {supportSummary || `${supportCount} support points nearby`}
           </div>
         )}
       </div>
@@ -178,9 +192,9 @@ export default function RouteMap({
     <div className="route-map-card">
       <div className="route-map-label" style={{ color: accent }}>{label}</div>
       <div ref={containerRef} className="route-map-container" />
-      {supportCount != null && (
+      {(supportSummary || supportCount != null) && (
         <div className="route-map-support">
-          {supportCount} support points nearby
+          {supportSummary || `${supportCount} support points nearby`}
         </div>
       )}
     </div>

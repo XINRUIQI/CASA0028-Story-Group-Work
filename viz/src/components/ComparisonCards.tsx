@@ -70,11 +70,13 @@ const CARD_DEFS: CardDef[] = [
     accent: "var(--accent-emerald)",
     render: (c) => ({
       primary: `${c.total_support_open ?? "—"} open support places`,
-      secondary: c.support_open_ratio != null
-        ? `${Math.round(Number(c.support_open_ratio) * 100)}% of nearby POIs open`
-        : "Open ratio unavailable",
+      secondary: c.route_support_index != null
+        ? `Route support index ${Number(c.route_support_index).toFixed(2)} · ${c.overlapping_msoa_count ?? 0} MSOAs touched`
+        : c.support_open_ratio != null
+          ? `${Math.round(Number(c.support_open_ratio) * 100)}% of nearby POIs open`
+          : "Open ratio unavailable",
     }),
-    note: "Shops, pharmacies, toilets, AEDs within 300m of stops.",
+    note: "Stop POIs plus corridor-weighted MSOA support context.",
   },
   {
     key: "activity_context",
@@ -82,10 +84,14 @@ const CARD_DEFS: CardDef[] = [
     icon: <Activity size={18} />,
     accent: "var(--accent-amber)",
     render: (c) => ({
-      primary: `${c.open_support_density ?? "—"} mean open POIs per stop`,
-      secondary: c.nte_data_available ? "Night-time economy data available" : "Limited activity data",
+      primary: c.route_activity_index != null
+        ? `Activity index ${Number(c.route_activity_index).toFixed(2)}`
+        : `${c.open_support_density ?? "—"} mean open POIs per stop`,
+      secondary: c.route_venue_density != null
+        ? `${Number(c.route_venue_density).toFixed(1)} venue intensity along route`
+        : c.nte_data_available ? "Night-time economy data available" : "Limited activity data",
     }),
-    note: "Proxy for 'someone is around', not real-time crowd count.",
+    note: "Corridor-weighted MSOA activity context, not real-time crowd count.",
   },
   {
     key: "lighting_proxy",

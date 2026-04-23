@@ -18,7 +18,11 @@ import asyncio
 import json
 from typing import Optional
 
+import geopandas as gpd
+import numpy as np
+import pandas as pd
 from fastapi import APIRouter, HTTPException, Query
+from shapely.geometry import LineString, Point
 
 from data.core.config import (
     PROCESSED_DIR,
@@ -32,6 +36,8 @@ from data.api.exposure import get_lighting_proxy, get_lit_road_share
 
 router = APIRouter(prefix="/compare", tags=["compare"])
 
+_MSOA_CONTEXT_CACHE: Optional[gpd.GeoDataFrame] = None
+
 
 def _load_headway() -> dict:
     filepath = PROCESSED_DIR / "headway_by_route_time.json"
@@ -39,6 +45,209 @@ def _load_headway() -> dict:
         return {}
     with open(filepath) as f:
         return json.load(f)
+
+
+def _zscore(series: pd.Series) -> pd.Series:
+    numeric = pd.to_numeric(series, errors="coerce").astype(float)
+    std = numeric.std(skipna=True)
+    if pd.isna(std) or std == 0:
+        return pd.Series(0.0, index=series.index, dtype=float)
+    mean = numeric.mean(skipna=True)
+    return (numeric - mean) / std
+
+
+def _load_msoa_context() -> gpd.GeoDataFrame:
+    global _MSOA_CONTEXT_CACHE
+    if _MSOA_CONTEXT_CACHE is not None:
+        return _MSOA_CONTEXT_CACHE
+
+    boundaries_path = PROCESSED_DIR / "msoa_boundaries.geojson"
+    support_path = PROCESSED_DIR / "msoa_night_support_activity.csv"
+    if not boundaries_path.exists() or not support_path.exists():
+        _MSOA_CONTEXT_CACHE = gpd.GeoDataFrame(geometry=[], crs="EPSG:4326")
+        return _MSOA_CONTEXT_CACHE
+
+    boundaries = gpd.read_file(boundaries_path)
+    support = pd.read_csv(support_path)
+    merged = boundaries.merge(support, on=["msoa_code", "msoa_name"], how="left")
+    projected = merged.to_crs("EPSG:27700")
+
+    area_km2 = projected.geometry.area / 1_000_000
+    projected["area_km2"] = area_km2.replace(0, np.nan)
+    projected["nte_density"] = projected["nte_businesses_2017"] / projected["area_km2"]
+    projected["pub_density"] = projected["pub_workplaces_2017"] / projected["area_km2"]
+    projected["food_density"] = projected["licensed_food_2017"] / projected["area_km2"]
+    projected["entertainment_density"] = projected["clubs_2017"] / projected["area_km2"]
+    projected["nightlife_density"] = projected["cim_nightlife_poi_count"] / projected["area_km2"]
+    projected["cultural_density"] = projected["cim_cultural_poi_count"] / projected["area_km2"]
+    projected["venue_density"] = (
+        projected[["cim_nightlife_poi_count", "cim_cultural_poi_count", "cim_lgbt_venue_count"]]
+        .fillna(0)
+        .sum(axis=1)
+        / projected["area_km2"]
+    )
+    projected["support_index_runtime"] = (
+        _zscore(projected["nte_density"]).fillna(0)
+        + _zscore(projected["pub_density"]).fillna(0)
+        + _zscore(projected["food_density"]).fillna(0)
+        + _zscore(projected["entertainment_density"]).fillna(0)
+    ) / 4
+    projected["activity_index_runtime"] = (
+        _zscore(projected["nte_density"]).fillna(0)
+        + _zscore(projected["nightlife_density"]).fillna(0)
+        + _zscore(projected["cultural_density"]).fillna(0)
+        + _zscore(projected["pub_density"]).fillna(0)
+    ) / 4
+
+    _MSOA_CONTEXT_CACHE = projected
+    return _MSOA_CONTEXT_CACHE
+
+
+def _decode_polyline(encoded: str) -> list[tuple[float, float]]:
+    coords: list[tuple[float, float]] = []
+    index = 0
+    lat = 0
+    lng = 0
+
+    while index < len(encoded):
+        shift = 0
+        result = 0
+        while True:
+            byte = ord(encoded[index]) - 63
+            index += 1
+            result |= (byte & 0x1F) << shift
+            shift += 5
+            if byte < 0x20:
+                break
+        lat += ~(result >> 1) if result & 1 else (result >> 1)
+
+        shift = 0
+        result = 0
+        while True:
+            byte = ord(encoded[index]) - 63
+            index += 1
+            result |= (byte & 0x1F) << shift
+            shift += 5
+            if byte < 0x20:
+                break
+        lng += ~(result >> 1) if result & 1 else (result >> 1)
+
+        coords.append((lng / 1e5, lat / 1e5))
+    return coords
+
+
+def _safe_point(payload: dict) -> Point | None:
+    lat = payload.get("lat")
+    lon = payload.get("lon")
+    if lat is None or lon is None:
+        return None
+    return Point(float(lon), float(lat))
+
+
+def _leg_linestring(leg: dict) -> LineString | None:
+    path = leg.get("path", "")
+    coords: list[tuple[float, float]] = []
+    if isinstance(path, str) and path:
+        try:
+            coords = _decode_polyline(path)
+        except Exception:
+            coords = []
+
+    if len(coords) >= 2:
+        return LineString(coords)
+
+    dep = _safe_point(leg.get("departure_point", {}))
+    arr = _safe_point(leg.get("arrival_point", {}))
+    if dep is not None and arr is not None and dep.coords[0] != arr.coords[0]:
+        return LineString([dep.coords[0], arr.coords[0]])
+    return None
+
+
+def _journey_geometries(journey: dict) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
+    line_records = []
+    stop_records = []
+    legs = journey.get("legs", [])
+
+    for index, leg in enumerate(legs):
+        geom = _leg_linestring(leg)
+        if geom is not None:
+            line_records.append({
+                "leg_index": index,
+                "is_walking": leg.get("is_walking", False),
+                "geometry": geom,
+            })
+
+        dep = _safe_point(leg.get("departure_point", {}))
+        arr = _safe_point(leg.get("arrival_point", {}))
+        if index == 0 and dep is not None:
+            stop_records.append({"stop_role": "origin", "geometry": dep})
+        if index < len(legs) - 1 and arr is not None:
+            stop_records.append({"stop_role": "transfer", "geometry": arr})
+        if index == len(legs) - 1 and arr is not None:
+            stop_records.append({"stop_role": "destination", "geometry": arr})
+
+    lines = gpd.GeoDataFrame(line_records, geometry="geometry", crs="EPSG:4326")
+    stops = gpd.GeoDataFrame(stop_records, geometry="geometry", crs="EPSG:4326")
+    return lines, stops
+
+
+def _weighted_overlap_mean(layer: gpd.GeoDataFrame, target_geom, value_column: str) -> float | None:
+    overlaps = layer.loc[layer.intersects(target_geom), [value_column, "geometry"]].copy()
+    if overlaps.empty:
+        return None
+    areas = overlaps.geometry.intersection(target_geom).area
+    total_area = areas.sum()
+    if total_area <= 0:
+        return None
+    weights = areas / total_area
+    values = pd.to_numeric(overlaps[value_column], errors="coerce")
+    valid = values.notna() & weights.notna()
+    if not valid.any():
+        return None
+    return float((weights[valid] * values[valid]).sum())
+
+
+def _route_support_activity_context(journey: dict) -> dict:
+    msoa_layer = _load_msoa_context()
+    if msoa_layer.empty:
+        return {}
+
+    lines, stops = _journey_geometries(journey)
+    if lines.empty:
+        return {}
+
+    projected_lines = lines.to_crs("EPSG:27700")
+    corridor = projected_lines.geometry.union_all().buffer(SUPPORT_BUFFER_METERS)
+    projected_stops = stops.to_crs("EPSG:27700") if not stops.empty else gpd.GeoDataFrame(geometry=[], crs="EPSG:27700")
+    stop_union = (
+        projected_stops.geometry.buffer(SUPPORT_BUFFER_METERS).union_all()
+        if not projected_stops.empty
+        else None
+    )
+
+    corridor_support = _weighted_overlap_mean(msoa_layer, corridor, "support_index_runtime")
+    corridor_activity = _weighted_overlap_mean(msoa_layer, corridor, "activity_index_runtime")
+    corridor_venue_density = _weighted_overlap_mean(msoa_layer, corridor, "venue_density")
+    corridor_nightlife_density = _weighted_overlap_mean(msoa_layer, corridor, "nightlife_density")
+
+    stop_support = _weighted_overlap_mean(msoa_layer, stop_union, "support_index_runtime") if stop_union is not None else None
+    stop_activity = _weighted_overlap_mean(msoa_layer, stop_union, "activity_index_runtime") if stop_union is not None else None
+
+    support_parts = [v for v in [corridor_support, stop_support] if v is not None]
+    activity_parts = [v for v in [corridor_activity, stop_activity] if v is not None]
+    overlapping_count = int(msoa_layer.intersects(corridor).sum())
+
+    return {
+        "corridor_support_index": round(corridor_support, 3) if corridor_support is not None else None,
+        "stop_buffer_support_index": round(stop_support, 3) if stop_support is not None else None,
+        "route_support_index": round(float(np.mean(support_parts)), 3) if support_parts else None,
+        "corridor_activity_index": round(corridor_activity, 3) if corridor_activity is not None else None,
+        "stop_buffer_activity_index": round(stop_activity, 3) if stop_activity is not None else None,
+        "route_activity_index": round(float(np.mean(activity_parts)), 3) if activity_parts else None,
+        "route_venue_density": round(corridor_venue_density, 2) if corridor_venue_density is not None else None,
+        "route_nightlife_density": round(corridor_nightlife_density, 2) if corridor_nightlife_density is not None else None,
+        "msoa_match_count": overlapping_count,
+    }
 
 
 # ── Card builders ────────────────────────────────────────────────
@@ -145,12 +354,13 @@ async def _service_uncertainty(
     }
 
 
-def _support_access(journey: dict, time_str: str) -> dict:
+def _support_access(journey: dict, time_str: str, route_context: Optional[dict] = None) -> dict:
     legs = journey.get("legs", [])
     total_open = 0
     total_all = 0
     total_lamps = 0
     stop_count = 0
+    route_context = route_context or {}
 
     for leg in legs:
         dep = leg.get("departure_point", {})
@@ -179,10 +389,20 @@ def _support_access(journey: dict, time_str: str) -> dict:
             round(total_open / total_all, 2) if total_all > 0 else None
         ),
         "mean_lamp_density": round(total_lamps / stop_count, 1) if stop_count else 0,
+        "route_support_index": route_context.get("route_support_index"),
+        "stop_buffer_support_index": route_context.get("stop_buffer_support_index"),
+        "corridor_support_index": route_context.get("corridor_support_index"),
+        "route_venue_density": route_context.get("route_venue_density"),
+        "msoa_match_count": route_context.get("msoa_match_count"),
     }
 
 
-def _activity_context(journey: dict, time_str: str) -> dict:
+def _activity_context(
+    journey: dict,
+    time_str: str,
+    support_card: Optional[dict] = None,
+    route_context: Optional[dict] = None,
+) -> dict:
     """
     Activity context along the route.
     Uses pre-loaded NTE data if available; falls back to support
@@ -194,13 +414,19 @@ def _activity_context(journey: dict, time_str: str) -> dict:
         with open(nte_path) as f:
             nte_data = json.load(f)
 
-    legs = journey.get("legs", [])
-    support_card = _support_access(journey, time_str)
+    route_context = route_context or {}
+    support_card = support_card or _support_access(journey, time_str, route_context)
 
     return {
         "card": "activity_context",
         "open_support_density": support_card["mean_support_open"],
         "nte_data_available": bool(nte_data),
+        "route_activity_index": route_context.get("route_activity_index"),
+        "corridor_activity_index": route_context.get("corridor_activity_index"),
+        "stop_buffer_activity_index": route_context.get("stop_buffer_activity_index"),
+        "route_venue_density": route_context.get("route_venue_density"),
+        "route_nightlife_density": route_context.get("route_nightlife_density"),
+        "msoa_match_count": route_context.get("msoa_match_count"),
         "note": "Proxy for 'someone is around', not real-time crowd count.",
     }
 
@@ -284,6 +510,8 @@ async def get_comparison_cards(
                 continue
 
             journey = _parse_journey(journeys_raw[0])
+            route_context = _route_support_activity_context(journey)
+            support_card = _support_access(journey, t, route_context)
 
             cards = {
                 "functional_cost": _functional_cost(journey),
@@ -291,8 +519,13 @@ async def get_comparison_cards(
                 "service_uncertainty": await _service_uncertainty(
                     journey, headway_data, t
                 ),
-                "support_access": _support_access(journey, t),
-                "activity_context": _activity_context(journey, t),
+                "support_access": support_card,
+                "activity_context": _activity_context(
+                    journey,
+                    t,
+                    support_card=support_card,
+                    route_context=route_context,
+                ),
                 "lighting_proxy": _lighting_proxy(journey),
             }
 
