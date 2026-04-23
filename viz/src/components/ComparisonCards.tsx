@@ -36,9 +36,9 @@ const CARD_DEFS: CardDef[] = [
     accent: "var(--champagne-gold)",
     render: (c) => ({
       primary: `${c.total_duration_min ?? "—"} min · ${c.transfers ?? 0} transfers`,
-      secondary: `${c.walk_min ?? 0} min walk · ${Math.round(Number(c.walk_distance_m) || 0)} m`,
+      secondary: `~${c.walk_min ?? 0} min interchange walk · ~${Math.round(Number(c.walk_distance_m) || 0)} m`,
     }),
-    note: "Total journey time, walking, transfers, fare.",
+    note: "Total journey time, estimated interchange walking, transfers, fare.",
   },
   {
     key: "waiting_burden",

@@ -114,6 +114,21 @@ async function loadStaticCompareCards(
   }
 }
 
+function deriveCompareResult(
+  origin: string,
+  destination: string,
+  times: string[],
+  cards: CompareCardsResult,
+): CompareResult {
+  return {
+    origin,
+    destination,
+    options: Object.fromEntries(
+      times.map((time) => [time, cards.options[time]?.journey ?? null]),
+    ),
+  };
+}
+
 const DEFAULT_ORIGIN = FIXED_ROUTE_PRESETS.student.origin;
 const DEFAULT_ORIGIN_NAME = FIXED_ROUTE_PRESETS.student.originName;
 const DEFAULT_DEST = FIXED_ROUTE_PRESETS.student.destination;
@@ -146,15 +161,14 @@ function CompareContent() {
     setLoading(true);
     setError("");
 
-    Promise.all([
-      api.compareJourney(origin, destination, times),
-      api.compareCards(origin, destination, times).catch(() =>
-        loadStaticCompareCards(origin, destination, times),
-      ),
-    ])
-      .then(([compare, cards]) => {
-        setData(compare);
+    api.compareCards(origin, destination, times)
+      .catch(() => loadStaticCompareCards(origin, destination, times))
+      .then((cards) => {
+        if (!cards) {
+          throw new Error("Could not load comparison data for this journey.");
+        }
         setCardsData(cards);
+        setData(deriveCompareResult(origin, destination, times, cards));
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
@@ -317,6 +331,10 @@ function CompareContent() {
             <h2 className="text-lg font-semibold mb-4">
               Route options by departure time
             </h2>
+            <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>
+              Walking figures are approximate. When TfL does not return a separate
+              walking leg, they are inferred from interchange time.
+            </p>
             <div className="grid md:grid-cols-3 gap-4">
               {times.map((time, i) => (
                 <OptionCard

@@ -108,8 +108,8 @@ export default function OptionCard({
     {
       key: "walking",
       icon: <Footprints size={14} />,
-      label: "Walking",
-      value: `${Math.round(journey.walk_distance_m)} m`,
+      label: "Walking (est.)",
+      value: `~${Math.round(journey.walk_distance_m)} m`,
     },
     {
       key: "transfers",

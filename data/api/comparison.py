@@ -387,7 +387,9 @@ def _route_safety_context(journey: dict) -> dict:
 
 def _functional_cost(journey: dict) -> dict:
     legs = journey.get("legs", [])
-    walk_min = sum(l["duration_min"] for l in legs if l.get("is_walking"))
+    walk_min = journey.get("walk_min")
+    if walk_min is None:
+        walk_min = sum(l["duration_min"] for l in legs if l.get("is_walking"))
     ride_min = sum(l["duration_min"] for l in legs if not l.get("is_walking"))
     return {
         "card": "functional_cost",

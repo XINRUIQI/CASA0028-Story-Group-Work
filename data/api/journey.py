@@ -11,6 +11,8 @@ from data.core.tfl_client import tfl_get
 
 router = APIRouter(prefix="/journey", tags=["journey"])
 
+INTERCHANGE_WALK_METERS_PER_MIN = 80
+
 
 def _to_tfl_time(t: str) -> str:
     if t == "24:00":
@@ -18,15 +20,24 @@ def _to_tfl_time(t: str) -> str:
     return t.replace(":", "")
 
 
+def _parse_int(value, default: int = 0) -> int:
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return default
+
+
 def _parse_leg(leg: dict) -> dict:
     mode = leg["mode"]["id"]
     is_walk = mode == "walking"
+    interchange_duration_min = _parse_int(leg.get("interChangeDuration"), 0)
 
     parsed = {
         "mode": leg["mode"]["name"],
         "mode_id": mode,
         "is_walking": is_walk,
         "duration_min": leg.get("duration", 0),
+        "interchange_duration_min": interchange_duration_min,
         "summary": leg.get("instruction", {}).get("summary", ""),
         "departure_point": {
             "name": leg["departurePoint"].get("commonName", ""),
@@ -49,7 +60,11 @@ def _parse_leg(leg: dict) -> dict:
     }
 
     if is_walk:
-        parsed["distance_m"] = leg.get("distance", 0)
+        parsed["distance_m"] = float(leg.get("distance") or 0)
+    elif interchange_duration_min > 0:
+        parsed["interchange_distance_m"] = (
+            interchange_duration_min * INTERCHANGE_WALK_METERS_PER_MIN
+        )
 
     return parsed
 
@@ -58,7 +73,14 @@ def _parse_journey(raw: dict) -> dict:
     """Extract structured journey data from a single TfL journey object."""
     legs = [_parse_leg(leg) for leg in raw.get("legs", [])]
 
-    total_walk_m = sum(l.get("distance_m", 0) for l in legs)
+    explicit_walk_min = sum(l["duration_min"] for l in legs if l.get("is_walking"))
+    interchange_walk_min = sum(
+        l.get("interchange_duration_min", 0) for l in legs if not l.get("is_walking")
+    )
+    total_walk_min = explicit_walk_min + interchange_walk_min
+    total_walk_m = sum(l.get("distance_m", 0) for l in legs) + sum(
+        l.get("interchange_distance_m", 0) for l in legs
+    )
     transfers = max(0, sum(1 for l in legs if not l["is_walking"]) - 1)
 
     fare = None
@@ -68,6 +90,7 @@ def _parse_journey(raw: dict) -> dict:
     return {
         "duration_min": raw.get("duration", 0),
         "fare": fare,
+        "walk_min": total_walk_min,
         "walk_distance_m": total_walk_m,
         "transfers": transfers,
         "legs": legs,
