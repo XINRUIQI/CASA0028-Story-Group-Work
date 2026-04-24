@@ -2,10 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Clock, ShieldCheck, Activity, HelpCircle } from "lucide-react";
 import HeroCover from "@/components/HeroCover";
-import DimensionCard from "@/components/DimensionCard";
-import { useReveal } from "@/lib/useReveal";
 import type { ContextTag } from "@/lib/types";
 
 /* ── Page 1: Context checkboxes ──────────────────────────────── */
@@ -47,35 +44,6 @@ const CONTEXT_NEEDS: Record<ContextTag, string[]> = {
     "Access to support facilities along the route",
   ],
 };
-
-/* ── Dimension cards data ────────────────────────────────────── */
-
-const DIMENSIONS = [
-  {
-    icon: <Clock size={20} style={{ color: "var(--champagne-gold)" }} />,
-    title: "Waiting",
-    description:
-      "How long you may wait, and what happens if you miss a connection.",
-  },
-  {
-    icon: <ShieldCheck size={20} style={{ color: "var(--champagne-gold)" }} />,
-    title: "Support nearby",
-    description:
-      "Shelters, open shops, pharmacies, and other facilities along the route.",
-  },
-  {
-    icon: <Activity size={20} style={{ color: "var(--champagne-gold)" }} />,
-    title: "Activity around stops",
-    description:
-      "Whether the surroundings are busy or quiet at different times.",
-  },
-  {
-    icon: <HelpCircle size={20} style={{ color: "var(--champagne-gold)" }} />,
-    title: "Service uncertainty",
-    description:
-      "How predictable the service is, and whether disruptions are reported.",
-  },
-];
 
 /* ── Silhouette SVG ──────────────────────────────────────────── */
 
@@ -147,7 +115,6 @@ function Silhouette({ glow }: { glow: string }) {
 
 export default function LandingPage() {
   const router = useRouter();
-  const revealRef = useReveal();
 
   const [contexts, setContexts] = useState<ContextTag[]>([]);
 
@@ -284,35 +251,6 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
-
-      {/* ═══════════════ Below: After-dark dimensions ═══════════════ */}
-      <div ref={revealRef} className="max-w-5xl mx-auto px-6 py-20">
-        {/* ── What changes after dark ── */}
-        <section className="reveal-section mb-12">
-          <h2 className="text-xl font-semibold text-center mb-6">
-            What changes after dark?
-          </h2>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {DIMENSIONS.map((d) => (
-              <DimensionCard key={d.title} {...d} />
-            ))}
-          </div>
-          <p
-            className="text-sm text-center mt-4"
-            style={{ color: "var(--text-muted)" }}
-          >
-            Not all journey costs appear in total travel time.
-          </p>
-        </section>
-
-        <p
-          className="reveal-section text-center text-sm max-w-lg mx-auto"
-          style={{ color: "var(--text-secondary)" }}
-        >
-          The same route can feel more fragmented, less supported, and harder to
-          recover from after dark.
-        </p>
-      </div>
     </>
   );
 }

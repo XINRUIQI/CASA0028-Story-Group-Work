@@ -1,50 +1,23 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import TagSelector from "@/components/TagSelector";
 import JourneyTimeline from "@/components/JourneyTimeline";
 import ComparisonCards from "@/components/ComparisonCards";
 import MissedConnection from "@/components/MissedConnection";
 import OptionCard from "@/components/OptionCard";
 import RouteMap from "@/components/RouteMap";
-import PersonaSwitch, {
-  PERSONA_DEFS,
-  type PersonaId,
-} from "@/components/PersonaSwitch";
+import { PERSONA_DEFS, type PersonaId } from "@/components/PersonaSwitch";
 import PersonaInsightsPanel from "@/components/PersonaInsightsPanel";
-import PresetJourneys from "@/components/PresetJourneys";
-import StopPointSearch from "@/components/StopPointSearch";
-import TimeSelector from "@/components/TimeSelector";
-import type { StopPointMatch } from "@/lib/api";
 import { useReveal } from "@/lib/useReveal";
-import {
-  PRIORITY_LABELS,
-  type Priority,
-  type ContextTag,
-  CONTEXT_LABELS,
-} from "@/lib/types";
+import { type ContextTag, CONTEXT_LABELS } from "@/lib/types";
 import {
   api,
   type CompareResult,
   type CompareCardsResult,
   type CardData,
 } from "@/lib/api";
-
-const PRIORITY_OPTIONS = Object.entries(PRIORITY_LABELS).map(([value, label]) => ({
-  value: value as Priority,
-  label,
-}));
-
-const PRIORITY_TO_METRIC: Record<Priority, string> = {
-  "less-waiting": "waiting",
-  "less-walking": "walking",
-  "fewer-interchanges": "transfers",
-  "more-support": "support",
-  "busier-surroundings": "activity",
-  "lower-uncertainty": "uncertainty",
-};
 
 const TIME_LABELS: Record<string, string> = {
   "18:00": "☀️ Daytime",
@@ -68,7 +41,6 @@ const DEFAULT_DEST_NAME = "Seven Sisters";
 
 function CompareContent() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const origin = searchParams.get("origin") || DEFAULT_ORIGIN;
   const originName = searchParams.get("originName") || (searchParams.get("origin") ? searchParams.get("origin")! : DEFAULT_ORIGIN_NAME);
   const destination = searchParams.get("destination") || DEFAULT_DEST;
@@ -78,42 +50,7 @@ function CompareContent() {
 
   const times = timesParam.split(",").filter(Boolean);
   const contexts = contextsParam.split(",").filter(Boolean) as ContextTag[];
-  const [priorities, setPriorities] = useState<Priority[]>([]);
   const [persona, setPersona] = useState<PersonaId>("student");
-
-  /* ── Plan-your-own-journey local state ── */
-  const [planOrigin, setPlanOrigin] = useState<StopPointMatch | null>(null);
-  const [planDestination, setPlanDestination] = useState<StopPointMatch | null>(
-    null,
-  );
-  const [planTimes, setPlanTimes] = useState<string[]>([
-    "18:00",
-    "21:00",
-    "22:30",
-  ]);
-  const canSubmitPlan =
-    !!planOrigin && !!planDestination && planTimes.length >= 2;
-
-  const handleSubmitPlan = () => {
-    if (!canSubmitPlan || !planOrigin || !planDestination) return;
-    const originId =
-      planOrigin.lat && planOrigin.lon
-        ? `${planOrigin.lat},${planOrigin.lon}`
-        : planOrigin.naptan_id;
-    const destId =
-      planDestination.lat && planDestination.lon
-        ? `${planDestination.lat},${planDestination.lon}`
-        : planDestination.naptan_id;
-    const params = new URLSearchParams({
-      origin: originId,
-      originName: planOrigin.name,
-      destination: destId,
-      destinationName: planDestination.name,
-      times: planTimes.join(","),
-      contexts: contexts.join(","),
-    });
-    router.push(`/compare?${params.toString()}`);
-  };
 
   const [data, setData] = useState<CompareResult | null>(null);
   const [cardsData, setCardsData] = useState<CompareCardsResult | null>(null);
@@ -145,9 +82,7 @@ function CompareContent() {
   const personaMetrics = activeDef.focusDimensions.map((d) =>
     d.replace(/_/g, " ").split(" ")[0],
   );
-  const highlightedMetrics = priorities.length > 0
-    ? priorities.map((p) => PRIORITY_TO_METRIC[p])
-    : personaMetrics;
+  const highlightedMetrics = personaMetrics;
 
   const cardsByTime: Record<string, Record<string, CardData> | undefined> = {};
   if (cardsData) {
@@ -208,26 +143,6 @@ function CompareContent() {
         )}
       </section>
 
-      {/* ── Persona perspective switch ── */}
-      <section className="reveal-section mb-8">
-        <h2 className="text-lg font-semibold mb-4">Traveller perspective</h2>
-        <PersonaSwitch active={persona} onChange={setPersona} />
-      </section>
-
-      {/* ── Priority selector ── */}
-      <section className="reveal-section card mb-8">
-        <h2 className="font-semibold mb-2">What matters most tonight?</h2>
-        <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
-          Selecting a priority highlights relevant dimensions. It does not
-          produce a single &ldquo;correct&rdquo; answer.
-        </p>
-        <TagSelector
-          options={PRIORITY_OPTIONS}
-          selected={priorities}
-          onChange={setPriorities}
-        />
-      </section>
-
       {/* ── Loading / error ── */}
       {loading && (
         <div className="text-center py-16" style={{ color: "var(--text-muted)" }}>
@@ -248,63 +163,6 @@ function CompareContent() {
 
       {data && !loading && (
         <>
-          {/* ── Try a preset journey (from page 0) ── */}
-          <section className="reveal-section mb-6">
-            <p className="section-label">Try a preset journey</p>
-            <p
-              className="text-sm mb-4"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              Each route represents a typical late-night scenario. Click to see
-              how it changes across departure times.
-            </p>
-            <PresetJourneys />
-          </section>
-
-          {/* ── OR divider ── */}
-          <div className="section-or reveal-section">or enter your own</div>
-
-          {/* ── Custom journey input (from page 0) ── */}
-          <section className="reveal-section card mb-8">
-            <h2 className="text-lg font-semibold mb-4">Plan your own journey</h2>
-            <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
-              On the static site, only common London stations are searchable.
-              For full search, run the backend locally.
-            </p>
-            <div className="grid md:grid-cols-2 gap-4 mb-4">
-              <StopPointSearch
-                label="From"
-                placeholder="Search origin stop or station..."
-                onSelect={setPlanOrigin}
-              />
-              <StopPointSearch
-                label="To"
-                placeholder="Search destination stop or station..."
-                onSelect={setPlanDestination}
-              />
-            </div>
-            <TimeSelector selected={planTimes} onChange={setPlanTimes} />
-          </section>
-
-          {/* ── Compare button ── */}
-          <div className="reveal-section text-center mb-10">
-            <button
-              className="btn-primary text-lg px-8 py-3"
-              disabled={!canSubmitPlan}
-              onClick={handleSubmitPlan}
-            >
-              Compare this journey
-            </button>
-            {!canSubmitPlan && (
-              <p
-                className="text-xs mt-2"
-                style={{ color: "var(--text-muted)" }}
-              >
-                Select origin, destination, and at least two departure times.
-              </p>
-            )}
-          </div>
-
           {/* ── Three-column route maps ── */}
           <section className="reveal-section mb-10">
             <h2 className="text-lg font-semibold mb-2">Route maps by departure time</h2>

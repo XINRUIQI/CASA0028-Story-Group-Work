@@ -467,18 +467,28 @@ export default function PersonaInsightsPanel({
       <div className="choose-persona-row">
         {PERSONA_DEFS.map((p) => {
           const Portrait = PORTRAITS[p.id];
+          const isActive = persona === p.id;
           return (
-            <button
-              key={p.id}
-              className={`choose-persona-card ${persona === p.id ? "active" : ""}`}
-              onClick={() => setPersona(p.id)}
-              type="button"
-            >
-              <div className="choose-persona-portrait">
-                <Portrait />
+            <div key={p.id} className="choose-persona-wrap">
+              <div
+                className={`choose-persona-bubble ${isActive ? "visible" : ""}`}
+                style={{ borderColor: p.accent, color: p.accent }}
+                role="status"
+                aria-hidden={!isActive}
+              >
+                {p.need}
               </div>
-              <span className="choose-persona-name">[{p.label}]</span>
-            </button>
+              <button
+                className={`choose-persona-card ${isActive ? "active" : ""}`}
+                onClick={() => setPersona(p.id)}
+                type="button"
+              >
+                <div className="choose-persona-portrait">
+                  <Portrait />
+                </div>
+                <span className="choose-persona-name">[{p.label}]</span>
+              </button>
+            </div>
           );
         })}
       </div>

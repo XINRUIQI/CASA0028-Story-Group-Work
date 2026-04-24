@@ -26,6 +26,10 @@
   --font-mono: var(--font-geist-mono);
 }
 
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   background: var(--bg-primary);
   color: var(--text-primary);
@@ -228,6 +232,148 @@ body {
   color: var(--text-primary);
   opacity: 0.7;
   z-index: 1;
+}
+
+/* ── Intro modal: "What changes after dark?" ────────────────── */
+
+.intro-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  background: radial-gradient(ellipse at 50% 40%, #111728 0%, #0a0d18 60%, #060810 100%);
+  animation: intro-fade-in 0.35s ease-out;
+}
+
+@keyframes intro-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.intro-modal {
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: clamp(3rem, 8vh, 5rem) clamp(1.5rem, 6vw, 4rem) clamp(2rem, 5vh, 3rem);
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  animation: intro-pop-in 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.1);
+}
+
+@keyframes intro-pop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.intro-modal-close {
+  position: fixed;
+  top: 1.25rem;
+  right: 1.25rem;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-muted);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+  z-index: 2;
+}
+.intro-modal-close:hover {
+  color: var(--text-primary);
+  border-color: rgba(201, 169, 110, 0.45);
+  background: rgba(201, 169, 110, 0.08);
+}
+
+.intro-modal-title {
+  font-size: clamp(1.6rem, 3.2vw, 2.4rem);
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: center;
+  margin: 0 0 clamp(2rem, 5vh, 3rem);
+  letter-spacing: 0.01em;
+}
+
+.intro-modal-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(0.85rem, 1.5vw, 1.25rem);
+  width: 100%;
+  max-width: 1180px;
+}
+
+@media (max-width: 960px) {
+  .intro-modal-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .intro-modal-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.intro-modal-card {
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 1.1rem 1.15rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  transition: border-color 0.25s, background 0.25s, transform 0.25s;
+}
+.intro-modal-card:hover {
+  border-color: rgba(201, 169, 110, 0.28);
+  background: rgba(201, 169, 110, 0.04);
+  transform: translateY(-2px);
+}
+
+.intro-modal-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(201, 169, 110, 0.12);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.25rem;
+}
+
+.intro-modal-card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.intro-modal-card-desc {
+  font-size: 0.86rem;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.intro-modal-footer {
+  margin-top: clamp(2rem, 5vh, 3rem);
+  display: flex;
+  justify-content: center;
+}
+
+.intro-modal-cta {
+  padding: 0.7rem 2.2rem;
+  font-size: 0.95rem;
 }
 
 /* Section divider for story flow */
@@ -2273,6 +2419,63 @@ body {
   display: flex;
   gap: 1.25rem;
   justify-content: center;
+  align-items: flex-end;
+  padding-top: 5.5rem;
+}
+
+.choose-persona-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.choose-persona-bubble {
+  position: absolute;
+  bottom: calc(100% + 0.85rem);
+  left: 50%;
+  transform: translate(-50%, 4px);
+  min-width: 180px;
+  max-width: 220px;
+  padding: 0.55rem 0.85rem;
+  background: rgba(18, 22, 38, 0.92);
+  backdrop-filter: blur(10px);
+  border: 1.5px solid var(--border-subtle);
+  border-radius: 12px;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  text-align: center;
+  font-style: italic;
+  letter-spacing: 0.01em;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.28s ease, transform 0.28s ease;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  z-index: 3;
+}
+.choose-persona-bubble.visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+.choose-persona-bubble::before,
+.choose-persona-bubble::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+}
+.choose-persona-bubble::before {
+  bottom: -8px;
+  border-top: 8px solid currentColor;
+  opacity: 0.9;
+}
+.choose-persona-bubble::after {
+  bottom: -6px;
+  border-top: 8px solid rgba(18, 22, 38, 0.92);
 }
 
 .choose-persona-card {
@@ -2469,10 +2672,22 @@ body {
   .choose-persona-row {
     flex-wrap: wrap;
     gap: 0.75rem;
+    padding-top: 0.25rem;
   }
-  .choose-persona-card {
+  .choose-persona-wrap {
     width: calc(50% - 0.5rem);
     min-width: 130px;
+  }
+  .choose-persona-card {
+    width: 100%;
+    min-width: 0;
+  }
+  .choose-persona-bubble {
+    min-width: 0;
+    max-width: 100%;
+    width: calc(100% - 0.5rem);
+    font-size: 0.72rem;
+    padding: 0.45rem 0.6rem;
   }
   .choose-metrics-row {
     flex-wrap: wrap;
@@ -2491,9 +2706,13 @@ body {
   }
 }
 @media (max-width: 480px) {
-  .choose-persona-card {
+  .choose-persona-wrap {
     width: calc(50% - 0.4rem);
     min-width: 110px;
+  }
+  .choose-persona-card {
+    width: 100%;
+    min-width: 0;
     padding: 0.85rem 0.6rem 0.7rem;
   }
   .choose-persona-portrait {
