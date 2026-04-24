@@ -27,6 +27,104 @@ def _parse_int(value, default: int = 0) -> int:
         return default
 
 
+def _time_to_minutes(time_value: str) -> int | None:
+    try:
+        hours, minutes = time_value.split(":", 1)
+        total = int(hours) * 60 + int(minutes)
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+    if total == 24 * 60:
+        return 0
+    return total
+
+
+def _is_peak_payg_time(time_value: str) -> bool:
+    minutes = _time_to_minutes(time_value)
+    if minutes is None:
+        return False
+    morning_peak = 6 * 60 + 30 <= minutes < 9 * 60 + 30
+    evening_peak = 16 * 60 <= minutes < 19 * 60
+    return morning_peak or evening_peak
+
+
+def _parse_ticket_cost_pence(value) -> int | None:
+    try:
+        return int(round(float(value) * 100))
+    except (TypeError, ValueError):
+        return None
+
+
+async def _lookup_single_fare(origin: str, destination: str, time: str) -> int | None:
+    data = await tfl_get(
+        f"/StopPoint/{origin}/FareTo/{destination}",
+        {"time": _to_tfl_time(time)},
+        raise_on_error=False,
+    )
+    if not isinstance(data, list):
+        return None
+
+    rows = []
+    for section in data:
+        if isinstance(section, dict):
+            rows.extend(section.get("rows", []))
+
+    if not rows:
+        return None
+
+    target_ticket_time = "Peak" if _is_peak_payg_time(time) else "Off Peak"
+    payg_tickets: list[dict] = []
+    fallback_tickets: list[dict] = []
+
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        for ticket in row.get("ticketsAvailable", []):
+            if not isinstance(ticket, dict):
+                continue
+
+            passenger_type = str(ticket.get("passengerType") or "")
+            if passenger_type and passenger_type.lower() != "adult":
+                continue
+
+            ticket_type = str(ticket.get("ticketType", {}).get("type") or "")
+            if ticket_type == "Pay as you go":
+                payg_tickets.append(ticket)
+            fallback_tickets.append(ticket)
+
+    preferred_tickets = payg_tickets or fallback_tickets
+    if not preferred_tickets:
+        return None
+
+    timed_match = next(
+        (
+            ticket for ticket in preferred_tickets
+            if str(ticket.get("ticketTime", {}).get("type") or "") == target_ticket_time
+        ),
+        None,
+    )
+    chosen_ticket = timed_match or preferred_tickets[0]
+    return _parse_ticket_cost_pence(chosen_ticket.get("cost"))
+
+
+async def _parse_journey_with_fare(
+    raw: dict,
+    *,
+    origin: str,
+    destination: str,
+    time: str,
+) -> dict:
+    journey = _parse_journey(raw)
+    if journey.get("fare") is not None:
+        return journey
+
+    if not origin or not destination:
+        return journey
+
+    journey["fare"] = await _lookup_single_fare(origin, destination, time)
+    return journey
+
+
 def _parse_leg(leg: dict) -> dict:
     mode = leg["mode"]["id"]
     is_walk = mode == "walking"
@@ -121,7 +219,15 @@ async def plan_journey(
     data = await tfl_get(
         f"/Journey/JourneyResults/{origin}/to/{destination}", params
     )
-    journeys = [_parse_journey(j) for j in data.get("journeys", [])]
+    journeys = [
+        await _parse_journey_with_fare(
+            journey,
+            origin=origin,
+            destination=destination,
+            time=time,
+        )
+        for journey in data.get("journeys", [])
+    ]
     return {
         "origin": origin,
         "destination": destination,
@@ -157,7 +263,15 @@ async def compare_journey(
                 raise_on_error=False,
             )
             journeys_raw = data.get("journeys", []) if isinstance(data, dict) else []
-            journeys = [_parse_journey(j) for j in journeys_raw]
+            journeys = [
+                await _parse_journey_with_fare(
+                    journey,
+                    origin=origin,
+                    destination=destination,
+                    time=t,
+                )
+                for journey in journeys_raw
+            ]
             results[t] = journeys[0] if journeys else None
         except Exception:
             results[t] = None

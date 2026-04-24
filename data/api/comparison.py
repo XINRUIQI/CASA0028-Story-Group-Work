@@ -31,7 +31,7 @@ from data.core.config import (
     time_to_band,
 )
 from data.core.tfl_client import tfl_get
-from data.api.journey import _parse_journey, _to_tfl_time, _ROUTE_PARAMS_BASE
+from data.api.journey import _parse_journey_with_fare, _to_tfl_time, _ROUTE_PARAMS_BASE
 from data.api.support import get_stop_support
 from data.api.exposure import get_lighting_proxy, get_lit_road_share
 
@@ -775,7 +775,12 @@ async def get_comparison_cards(
                 results[t] = None
                 continue
 
-            journey = _parse_journey(journeys_raw[0])
+            journey = await _parse_journey_with_fare(
+                journeys_raw[0],
+                origin=origin,
+                destination=destination,
+                time=t,
+            )
             route_context = _route_support_activity_context(journey)
             safety_context = _route_safety_context(journey)
             support_card = _support_access(journey, t, route_context)
@@ -858,7 +863,12 @@ async def get_hourly_curves(
             curves[t] = None
             continue
 
-        journey = _parse_journey(journeys_raw[0])
+        journey = await _parse_journey_with_fare(
+            journeys_raw[0],
+            origin=origin,
+            destination=destination,
+            time=t,
+        )
         wb = _waiting_burden(journey, headway_data, t)
         sa = _support_access(journey, t)
         safety = _safety_exposure(journey, route_context=_route_safety_context(journey))

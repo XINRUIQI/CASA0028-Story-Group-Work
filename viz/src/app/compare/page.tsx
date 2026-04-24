@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import TagSelector from "@/components/TagSelector";
@@ -241,6 +241,7 @@ function CompareContent() {
   const [error, setError] = useState("");
   const [selectedTime, setSelectedTime] = useState<string>(times[0] || "");
   const [showMetricGuide, setShowMetricGuide] = useState(false);
+  const compareRequestRef = useRef(0);
 
   const revealRef = useReveal();
 
@@ -256,6 +257,10 @@ function CompareContent() {
 
   useEffect(() => {
     if (!origin || !destination) return;
+    const requestId = compareRequestRef.current + 1;
+    compareRequestRef.current = requestId;
+    const isCurrentRequest = () => compareRequestRef.current === requestId;
+
     setLoading(true);
     setError("");
 
@@ -264,6 +269,8 @@ function CompareContent() {
       loadStaticCompareCards(origin, destination, [...DENSE_COMPARE_FALLBACK_TIMES]),
     ])
       .then(([staticCards, denseCards]) => {
+        if (!isCurrentRequest()) return;
+
         const staticMerged = mergeCompareCards(times, staticCards, [denseCards]);
 
         if (staticMerged) {
@@ -274,6 +281,8 @@ function CompareContent() {
 
         return api.compareCards(origin, destination, times)
           .then((liveCards) => {
+            if (!isCurrentRequest()) return;
+
             const merged = mergeCompareCards(times, liveCards, [staticCards, denseCards]);
             if (!merged) {
               throw new Error("Could not load comparison data for this journey.");
@@ -283,12 +292,14 @@ function CompareContent() {
             setLoading(false);
           })
           .catch(() => {
+            if (!isCurrentRequest()) return;
             if (!staticMerged) {
               throw new Error("Could not load comparison data for this journey.");
             }
           });
       })
       .catch((e) => {
+        if (!isCurrentRequest()) return;
         setError(e.message);
         setLoading(false);
       });

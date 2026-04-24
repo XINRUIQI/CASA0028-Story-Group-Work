@@ -103,7 +103,7 @@ export default function OptionCard({
       key: "fare",
       icon: <Coins size={14} />,
       label: "Fare",
-      value: journey.fare ? `£${(journey.fare / 100).toFixed(2)}` : "—",
+      value: journey.fare != null ? `£${(journey.fare / 100).toFixed(2)}` : "—",
     },
     {
       key: "walking",
