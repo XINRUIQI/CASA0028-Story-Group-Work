@@ -19,11 +19,15 @@ import urllib.error
 API = os.environ.get("API_BASE", "http://localhost:8000")
 OUT = os.path.join(os.path.dirname(__file__), "..", "..", "viz", "public", "static-data")
 
+# Must mirror PresetJourneys.tsx — each preset's (origin, destination, times)
+# lands both in /compare/cards and /journey/compare static fallbacks so the
+# prototype works on GitHub Pages without a live backend.
 PRESET_ROUTES = [
-    ("940GZZLUESQ", "HUBSVS"),
-    ("940GZZLUSTD", "940GZZLUBXN"),
-    ("940GZZLUKSX", "940GZZLUBKG"),
-    ("940GZZLULVT", "940GZZDLGRE"),
+    # (origin, destination, ui_times)
+    ("940GZZLUESQ", "HUBSVS", "18:00,21:00,23:30"),        # Late-night student
+    ("940GZZLUSTD", "940GZZLUBXN", "18:00,21:00,23:30"),   # Budget traveller
+    ("940GZZLUKSX", "940GZZLUBKG", "22:00,23:30,01:00"),   # Night-shift worker
+    ("940GZZLULVT", "940GZZDLGRE", "18:00,21:00,23:30"),   # Unfamiliar traveller
 ]
 
 CHOOSE_COMPARE_TIMES = "18:00,21:00,23:30"
@@ -87,52 +91,72 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     print(f"Prefetching from {API} -> {OUT}/\n")
 
-    # ── 1. Compare cards (hourly) — choose page ──
-    print("── Compare cards (hourly, choose page) ──")
-    for origin, dest in PRESET_ROUTES:
+    # ── 1. Compare cards — per‑preset UI times (compare page) ──
+    print("── Compare cards (preset UI times) ──")
+    for origin, dest, ui_times in PRESET_ROUTES:
+        fetch_and_save("/compare/cards", {
+            "origin": origin,
+            "destination": dest,
+            "times": ui_times,
+        })
+
+    # ── 2. Compare cards — choose page shared default (only if not already fetched) ──
+    print("\n── Compare cards (choose page default) ──")
+    for origin, dest, ui_times in PRESET_ROUTES:
+        if ui_times == CHOOSE_COMPARE_TIMES:
+            continue
         fetch_and_save("/compare/cards", {
             "origin": origin,
             "destination": dest,
             "times": CHOOSE_COMPARE_TIMES,
         })
 
-    # ── 2. Compare cards (3 times) — compare page ──
-    print("\n── Compare cards (3 times, compare page) ──")
-    for origin, dest in PRESET_ROUTES:
+    # ── 3. Compare cards — 3‑time stress preset ──
+    print("\n── Compare cards (stress preset) ──")
+    for origin, dest, _ui_times in PRESET_ROUTES:
         fetch_and_save("/compare/cards", {
             "origin": origin,
             "destination": dest,
             "times": COMPARE_TIMES,
         })
 
-    # ── 3. Compare hourly curves ──
+    # ── 4. Compare hourly curves ──
     print("\n── Compare hourly curves ──")
-    for origin, dest in PRESET_ROUTES:
+    for origin, dest, _ui_times in PRESET_ROUTES:
         fetch_and_save("/compare/hourly", {
             "origin": origin,
             "destination": dest,
             "times": HOURLY_CURVE_TIMES,
         })
 
-    # ── 4. Journey compare — compare page ──
-    print("\n── Journey compare ──")
-    for origin, dest in PRESET_ROUTES:
+    # ── 5. Journey compare — per‑preset UI times ──
+    print("\n── Journey compare (preset UI times) ──")
+    for origin, dest, ui_times in PRESET_ROUTES:
+        fetch_and_save("/journey/compare", {
+            "origin": origin,
+            "destination": dest,
+            "times": ui_times,
+        })
+
+    # ── 6. Journey compare — stress preset ──
+    print("\n── Journey compare (stress preset) ──")
+    for origin, dest, _ui_times in PRESET_ROUTES:
         fetch_and_save("/journey/compare", {
             "origin": origin,
             "destination": dest,
             "times": COMPARE_TIMES,
         })
 
-    # ── 5. Plan journey — unpack page ──
+    # ── 7. Plan journey — unpack page ──
     print("\n── Plan journey (unpack page) ──")
-    for origin, dest in PRESET_ROUTES:
+    for origin, dest, _ui_times in PRESET_ROUTES:
         fetch_and_save("/journey/plan", {
             "origin": origin,
             "destination": dest,
             "time": "21:00",
         })
 
-    # ── 6. Fairness layers ──
+    # ── 8. Fairness layers ──
     print("\n── Fairness layers ──")
     for layer in FAIRNESS_LAYERS:
         fetch_and_save(f"/fairness/layer/{layer}")

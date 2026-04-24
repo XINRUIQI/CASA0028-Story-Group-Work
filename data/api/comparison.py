@@ -406,14 +406,29 @@ def _waiting_burden(journey: dict, headway_data: dict, time_str: str) -> dict:
     band = time_to_band(time_str)
     legs = journey.get("legs", [])
 
-    waits = []
-    for leg in legs:
+    leg_waits: list[dict] = []
+    for idx, leg in enumerate(legs):
         if leg.get("is_walking"):
             continue
-        line_id = leg.get("line_id", "")
-        hw = headway_data.get(line_id, {}).get(band, 10)
-        waits.append(hw / 2)  # random-arrival expected wait
+        line_id = leg.get("line_id", "") or ""
+        line_hw = headway_data.get(line_id, {})
+        hw = line_hw.get(band, 10)
+        day_hw = line_hw.get("inter_peak", 5)
+        expected_wait = round(hw / 2, 1)
+        gap_ratio = round(hw / day_hw, 2) if day_hw > 0 else None
+        leg_waits.append(
+            {
+                "leg_index": idx,
+                "line_id": line_id,
+                "time_band": band,
+                "headway_min": hw,
+                "daytime_headway_min": day_hw,
+                "expected_wait_min": expected_wait,
+                "gap_ratio": gap_ratio,
+            }
+        )
 
+    waits = [lw["expected_wait_min"] for lw in leg_waits]
     total_wait = sum(waits)
     max_wait = max(waits) if waits else 0
     duration = journey.get("duration_min", 1)
@@ -425,6 +440,7 @@ def _waiting_burden(journey: dict, headway_data: dict, time_str: str) -> dict:
         "max_single_wait_min": round(max_wait, 1),
         "wait_share_of_journey": wait_share,
         "wait_segments": len(waits),
+        "leg_waits": leg_waits,
     }
 
 

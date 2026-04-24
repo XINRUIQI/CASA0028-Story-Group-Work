@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import JourneyTimeline from "@/components/JourneyTimeline";
+import JourneyTimelineCompare from "@/components/JourneyTimelineCompare";
 import ComparisonCards from "@/components/ComparisonCards";
 import MissedConnection from "@/components/MissedConnection";
 import OptionCard from "@/components/OptionCard";
@@ -50,7 +50,7 @@ function CompareContent() {
 
   const times = timesParam.split(",").filter(Boolean);
   const contexts = contextsParam.split(",").filter(Boolean) as ContextTag[];
-  const [persona, setPersona] = useState<PersonaId>("student");
+  const [persona, setPersona] = useState<PersonaId | null>(null);
 
   const [data, setData] = useState<CompareResult | null>(null);
   const [cardsData, setCardsData] = useState<CompareCardsResult | null>(null);
@@ -78,11 +78,12 @@ function CompareContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [origin, destination, timesParam]);
 
-  const activeDef = PERSONA_DEFS.find((p) => p.id === persona)!;
-  const personaMetrics = activeDef.focusDimensions.map((d) =>
-    d.replace(/_/g, " ").split(" ")[0],
-  );
-  const highlightedMetrics = personaMetrics;
+  const activeDef = persona
+    ? PERSONA_DEFS.find((p) => p.id === persona) ?? null
+    : null;
+  const highlightedMetrics = activeDef
+    ? activeDef.focusDimensions.map((d) => d.replace(/_/g, " ").split(" ")[0])
+    : [];
 
   const cardsByTime: Record<string, Record<string, CardData> | undefined> = {};
   if (cardsData) {
@@ -188,27 +189,13 @@ function CompareContent() {
             </div>
           </section>
 
-          {/* ── Journey Timelines ── */}
+          {/* ── Journey Timeline (comparative narrative panel) ── */}
           <section className="reveal-section mb-10">
-            <h2 className="text-lg font-semibold mb-4">Journey timeline</h2>
-            <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>
-              Not just total time — see which segment gets heavier after dark.
-            </p>
-            <div className="timeline-stack">
-              {times.map((t, i) => {
-                const j = data.options[t];
-                if (!j) return null;
-                return (
-                  <JourneyTimeline
-                    key={t}
-                    legs={j.legs}
-                    totalDuration={j.duration_min}
-                    label={t}
-                    accent={TIME_COLORS[i % TIME_COLORS.length]}
-                  />
-                );
-              })}
-            </div>
+            <JourneyTimelineCompare
+              times={times}
+              options={data.options}
+              cardsByTime={cardsByTime}
+            />
           </section>
 
           {/* ── Option cards ── */}

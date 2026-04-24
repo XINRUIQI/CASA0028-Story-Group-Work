@@ -403,17 +403,17 @@ function HourlyLineChart({
 /* ── Main component ── */
 
 interface Props {
-  persona?: PersonaId;
-  onPersonaChange?: (p: PersonaId) => void;
+  persona?: PersonaId | null;
+  onPersonaChange?: (p: PersonaId | null) => void;
 }
 
 export default function PersonaInsightsPanel({
   persona: personaProp,
   onPersonaChange,
 }: Props = {}) {
-  const [personaState, setPersonaState] = useState<PersonaId>("student");
-  const persona = personaProp ?? personaState;
-  const setPersona = (p: PersonaId) => {
+  const [personaState, setPersonaState] = useState<PersonaId | null>(null);
+  const persona = personaProp !== undefined ? personaProp : personaState;
+  const setPersona = (p: PersonaId | null) => {
     if (onPersonaChange) onPersonaChange(p);
     if (personaProp === undefined) setPersonaState(p);
   };
@@ -421,11 +421,12 @@ export default function PersonaInsightsPanel({
   const [curves, setCurves] = useState<Record<string, HourlyPoint | null>>({});
   const [fetchedKey, setFetchedKey] = useState("");
 
-  const preset = PRESET_ROUTES[persona];
-  const routeKey = `${preset.origin}|${preset.dest}`;
-  const loading = routeKey !== fetchedKey;
+  const preset = persona ? PRESET_ROUTES[persona] : null;
+  const routeKey = preset ? `${preset.origin}|${preset.dest}` : "";
+  const loading = !!preset && routeKey !== fetchedKey;
 
   useEffect(() => {
+    if (!preset) return;
     let stale = false;
     api
       .compareCards(preset.origin, preset.dest, HOURS)
@@ -460,7 +461,7 @@ export default function PersonaInsightsPanel({
     return () => {
       stale = true;
     };
-  }, [preset.origin, preset.dest]);
+  }, [preset?.origin, preset?.dest]);
 
   return (
     <div className="persona-insights-panel">
@@ -480,8 +481,9 @@ export default function PersonaInsightsPanel({
               </div>
               <button
                 className={`choose-persona-card ${isActive ? "active" : ""}`}
-                onClick={() => setPersona(p.id)}
+                onClick={() => setPersona(isActive ? null : p.id)}
                 type="button"
+                aria-pressed={isActive}
               >
                 <div className="choose-persona-portrait">
                   <Portrait />
@@ -497,7 +499,11 @@ export default function PersonaInsightsPanel({
         <h3 className="choose-chart-title">
           Hourly Curves of extra journey burdens (18:00 - 02:00)
         </h3>
-        {loading ? (
+        {!persona ? (
+          <p className="choose-chart-loading">
+            Pick a traveller above to see their hourly burden curves.
+          </p>
+        ) : loading ? (
           <p className="choose-chart-loading">Loading hourly data…</p>
         ) : Object.keys(curves).length === 0 ? (
           <p className="choose-chart-loading">

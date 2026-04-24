@@ -126,18 +126,18 @@ export default function HeroCover() {
       {/* Centre content */}
       <div className={`hero-content ${visible ? "hero-visible" : ""}`}>
         <h1 className="hero-title">
-          <span className="hero-title-line">After Dark:</span>
+          <span className="hero-title-line">Day and Night:</span>
           <span className="hero-subtitle-line">
             How the Same Journey Changes
           </span>
         </h1>
 
         <p className="hero-description">
-          The point is not to declare one option right or wrong,
+          The point is not to decide which journey is better,
           <br />
-          but to show how the same journey asks different things
+          but to show how the same route asks different things
           <br />
-          of the traveller after dark.
+          of the traveller in daylight and after dark.
         </p>
 
         <button onClick={openIntro} className="hero-cta" type="button">

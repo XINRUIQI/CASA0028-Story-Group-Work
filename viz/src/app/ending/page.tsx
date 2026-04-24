@@ -37,7 +37,7 @@ export default function EndingPage() {
         <div className="final-credits">
           <div className="final-credit-group">
             <span className="final-credit-label">Project</span>
-            <span className="final-credit-value">After Dark: How the Same Journey Changes</span>
+            <span className="final-credit-value">Day and Night: How the Same Journey Changes</span>
           </div>
           <div className="final-credit-divider" />
           <div className="final-credit-group">
