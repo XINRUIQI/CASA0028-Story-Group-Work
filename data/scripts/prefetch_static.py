@@ -23,11 +23,12 @@ PRESET_ROUTES = [
     ("940GZZLUESQ", "HUBSVS"),
     ("940GZZLUSTD", "940GZZLUBXN"),
     ("940GZZLUKSX", "940GZZLUBKG"),
-    ("940GZZLUPAC", "HUBGNW"),
+    ("940GZZLULVT", "940GZZDLGRE"),
 ]
 
-HOURLY_TIMES = "18:00,19:00,20:00,21:00,22:00,23:00,00:00,01:00,02:00"
-COMPARE_TIMES = "18:00,21:00,23:30"
+CHOOSE_COMPARE_TIMES = "18:00,21:00,23:30"
+COMPARE_TIMES = "14:00,19:00,00:00"
+HOURLY_CURVE_TIMES = "06:00,09:00,12:00,15:00,18:00,21:00,24:00,03:00"
 
 FAIRNESS_LAYERS = [
     "waiting_burden_increase",
@@ -92,7 +93,7 @@ def main():
         fetch_and_save("/compare/cards", {
             "origin": origin,
             "destination": dest,
-            "times": HOURLY_TIMES,
+            "times": CHOOSE_COMPARE_TIMES,
         })
 
     # ── 2. Compare cards (3 times) — compare page ──
@@ -104,7 +105,16 @@ def main():
             "times": COMPARE_TIMES,
         })
 
-    # ── 3. Journey compare — compare page ──
+    # ── 3. Compare hourly curves ──
+    print("\n── Compare hourly curves ──")
+    for origin, dest in PRESET_ROUTES:
+        fetch_and_save("/compare/hourly", {
+            "origin": origin,
+            "destination": dest,
+            "times": HOURLY_CURVE_TIMES,
+        })
+
+    # ── 4. Journey compare — compare page ──
     print("\n── Journey compare ──")
     for origin, dest in PRESET_ROUTES:
         fetch_and_save("/journey/compare", {
@@ -113,7 +123,7 @@ def main():
             "times": COMPARE_TIMES,
         })
 
-    # ── 4. Plan journey — unpack page ──
+    # ── 5. Plan journey — unpack page ──
     print("\n── Plan journey (unpack page) ──")
     for origin, dest in PRESET_ROUTES:
         fetch_and_save("/journey/plan", {
@@ -122,7 +132,7 @@ def main():
             "time": "21:00",
         })
 
-    # ── 5. Fairness layers ──
+    # ── 6. Fairness layers ──
     print("\n── Fairness layers ──")
     for layer in FAIRNESS_LAYERS:
         fetch_and_save(f"/fairness/layer/{layer}")
