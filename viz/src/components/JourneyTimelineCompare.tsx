@@ -1,6 +1,6 @@
 "use client";
 
-import { Zap } from "lucide-react";
+import { Zap, Clock, PoundSterling, Footprints, Shuffle } from "lucide-react";
 import type { Journey, Leg, CardData } from "@/lib/api";
 
 /* ──────────────────────────────────────────────────────────────
@@ -44,6 +44,13 @@ interface TimelineRow {
   segments: Segment[];
   isNight: boolean;
   hasRisk: boolean;
+  // Real journey stats straight from the TfL plan.
+  fare: number | null;        // pence; null when TfL doesn't return a fare
+  walkDistanceM: number;      // metres of walking across all walk legs
+  transfers: number;          // number of line changes
+  // `true` when TfL returned no viable journey for this departure time.
+  // We still render the row so all three departures stay visible.
+  unavailable: boolean;
 }
 
 export interface JourneyTimelineCompareProps {
@@ -182,9 +189,26 @@ function buildRow(
   time: string,
   journey: Journey | null,
   cards?: Record<string, CardData>,
-): TimelineRow | null {
-  if (!journey) return null;
+): TimelineRow {
   const { band, isNight } = bandFor(time);
+
+  // No viable journey (e.g. TfL couldn't plan a 01:00 trip).
+  // Keep the row so the user still sees that this slot exists.
+  if (!journey) {
+    return {
+      key: time,
+      band,
+      time,
+      totalMin: 0,
+      segments: [],
+      isNight,
+      hasRisk: isNight,
+      fare: null,
+      walkDistanceM: 0,
+      transfers: 0,
+      unavailable: true,
+    };
+  }
 
   // Pull real per‑leg wait data from waiting_burden card if present.
   const wb = cards?.waiting_burden as
@@ -199,7 +223,33 @@ function buildRow(
   // — show the sum so the bar and the label agree.
   const totalMin = Math.max(segTotal, journey.duration_min);
 
-  return { key: time, band, time, totalMin, segments, isNight, hasRisk };
+  return {
+    key: time,
+    band,
+    time,
+    totalMin,
+    segments,
+    isNight,
+    hasRisk,
+    fare: journey.fare,
+    walkDistanceM: journey.walk_distance_m ?? 0,
+    transfers: journey.transfers ?? 0,
+    unavailable: false,
+  };
+}
+
+/* ── Stat formatting helpers ────────────────────────────────── */
+
+function formatFare(pence: number | null): string {
+  if (pence == null) return "—";
+  // TfL returns fares in pence (e.g. 765 → £7.65).
+  return `£${(pence / 100).toFixed(2)}`;
+}
+
+function formatWalk(metres: number): string {
+  if (!metres) return "0 m";
+  if (metres >= 1000) return `${(metres / 1000).toFixed(1)} km`;
+  return `${Math.round(metres)} m`;
 }
 
 /* ── Segment pill ────────────────────────────────────────────── */
@@ -262,15 +312,18 @@ export default function JourneyTimelineCompare({
   options,
   cardsByTime,
 }: JourneyTimelineCompareProps) {
-  const rows = times
-    .map((t) => buildRow(t, options[t] ?? null, cardsByTime?.[t]))
-    .filter((r): r is TimelineRow => r !== null);
+  const rows = times.map((t) =>
+    buildRow(t, options[t] ?? null, cardsByTime?.[t]),
+  );
 
   if (!rows.length) return null;
 
-  // Shared scale so rows are visually comparable.
-  const maxTotal = Math.max(...rows.map((r) => r.totalMin), 1);
-  const anyRisk = rows.some((r) => r.hasRisk);
+  // Shared scale across *available* rows so empty slots don't squash the bar.
+  const maxTotal = Math.max(
+    ...rows.filter((r) => !r.unavailable).map((r) => r.totalMin),
+    1,
+  );
+  const anyRisk = rows.some((r) => r.hasRisk && !r.unavailable);
 
   return (
     <div className="jtc-panel">
@@ -319,17 +372,71 @@ export default function JourneyTimelineCompare({
         {rows.map((row) => (
           <div
             key={row.key}
-            className={`jtc-row ${row.isNight ? "jtc-row--night" : ""}`}
+            className={`jtc-row ${row.isNight ? "jtc-row--night" : ""} ${
+              row.unavailable ? "jtc-row--empty" : ""
+            }`}
           >
             <div className="jtc-row-label">
               <div className="jtc-row-band">{row.band}</div>
               <div className="jtc-row-time">{row.time}</div>
-              <div className="jtc-row-total">{row.totalMin} min total</div>
             </div>
-            <div className="jtc-row-track">
-              {row.segments.map((seg, i) => (
-                <SegmentPill key={i} seg={seg} maxTotal={maxTotal} />
-              ))}
+            <div className="jtc-row-main">
+              {row.unavailable ? (
+                <div
+                  className="jtc-row-empty"
+                  title="TfL Journey Planner returned no viable route for this departure time."
+                >
+                  <Zap size={12} />
+                  <span>
+                    No service planned at this time — Night Tube / bus may
+                    be the only option.
+                  </span>
+                </div>
+              ) : (
+                <>
+                  <div className="jtc-row-track">
+                    {row.segments.map((seg, i) => (
+                      <SegmentPill key={i} seg={seg} maxTotal={maxTotal} />
+                    ))}
+                  </div>
+                  <div className="jtc-row-stats" aria-label="Journey stats">
+                    <span
+                      className="jtc-stat"
+                      title={`${row.totalMin} min total journey time`}
+                    >
+                      <Clock size={11} />
+                      <span className="jtc-stat-value">{row.totalMin}</span>
+                      <span className="jtc-stat-unit">min</span>
+                    </span>
+                    <span
+                      className="jtc-stat"
+                      title="Fare returned by TfL Journey Planner"
+                    >
+                      <PoundSterling size={11} />
+                      <span className="jtc-stat-value">
+                        {formatFare(row.fare)}
+                      </span>
+                    </span>
+                    <span
+                      className="jtc-stat"
+                      title="Total walking distance across all legs"
+                    >
+                      <Footprints size={11} />
+                      <span className="jtc-stat-value">
+                        {formatWalk(row.walkDistanceM)}
+                      </span>
+                      <span className="jtc-stat-unit">walk</span>
+                    </span>
+                    <span className="jtc-stat" title="Number of line changes">
+                      <Shuffle size={11} />
+                      <span className="jtc-stat-value">{row.transfers}</span>
+                      <span className="jtc-stat-unit">
+                        {row.transfers === 1 ? "transfer" : "transfers"}
+                      </span>
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         ))}

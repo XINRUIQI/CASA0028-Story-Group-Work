@@ -15,6 +15,40 @@ interface PersonaDef {
   need: string;
 }
 
+export interface PersonaRoute {
+  origin: string;
+  dest: string;
+  oName: string;
+  dName: string;
+}
+
+export const PERSONA_ROUTES: Record<PersonaId, PersonaRoute> = {
+  student: {
+    origin: "940GZZLUESQ",
+    dest: "HUBSVS",
+    oName: "Euston Square",
+    dName: "Seven Sisters",
+  },
+  budget: {
+    origin: "940GZZLUSTD",
+    dest: "940GZZLUBXN",
+    oName: "Stratford",
+    dName: "Brixton",
+  },
+  nightworker: {
+    origin: "940GZZLUKSX",
+    dest: "940GZZLUBKG",
+    oName: "King's Cross",
+    dName: "Barking",
+  },
+  unfamiliar: {
+    origin: "940GZZLUPAC",
+    dest: "HUBGNW",
+    oName: "Paddington",
+    dName: "Greenwich",
+  },
+};
+
 export const PERSONA_DEFS: PersonaDef[] = [
   {
     id: "student",

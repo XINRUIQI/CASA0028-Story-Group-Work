@@ -1,14 +1,17 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState, useEffect, useRef, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import JourneyTimelineCompare from "@/components/JourneyTimelineCompare";
-import ComparisonCards from "@/components/ComparisonCards";
-import MissedConnection from "@/components/MissedConnection";
 import OptionCard from "@/components/OptionCard";
 import RouteMap from "@/components/RouteMap";
-import { PERSONA_DEFS, type PersonaId } from "@/components/PersonaSwitch";
+import Mechanisms from "@/components/Mechanisms";
+import {
+  PERSONA_DEFS,
+  PERSONA_ROUTES,
+  type PersonaId,
+} from "@/components/PersonaSwitch";
 import PersonaInsightsPanel from "@/components/PersonaInsightsPanel";
 import { useReveal } from "@/lib/useReveal";
 import { type ContextTag, CONTEXT_LABELS } from "@/lib/types";
@@ -17,6 +20,7 @@ import {
   type CompareResult,
   type CompareCardsResult,
   type CardData,
+  type JourneyRecoveryResult,
 } from "@/lib/api";
 
 const TIME_LABELS: Record<string, string> = {
@@ -41,10 +45,7 @@ const DEFAULT_DEST_NAME = "Seven Sisters";
 
 function CompareContent() {
   const searchParams = useSearchParams();
-  const origin = searchParams.get("origin") || DEFAULT_ORIGIN;
-  const originName = searchParams.get("originName") || (searchParams.get("origin") ? searchParams.get("origin")! : DEFAULT_ORIGIN_NAME);
-  const destination = searchParams.get("destination") || DEFAULT_DEST;
-  const destinationName = searchParams.get("destinationName") || (searchParams.get("destination") ? searchParams.get("destination")! : DEFAULT_DEST_NAME);
+  const router = useRouter();
   const timesParam = searchParams.get("times") || "18:00,21:00,23:30";
   const contextsParam = searchParams.get("contexts") || "";
 
@@ -52,13 +53,45 @@ function CompareContent() {
   const contexts = contextsParam.split(",").filter(Boolean) as ContextTag[];
   const [persona, setPersona] = useState<PersonaId | null>(null);
 
+  const urlOrigin = searchParams.get("origin");
+  const urlOriginName = searchParams.get("originName");
+  const urlDest = searchParams.get("destination");
+  const urlDestName = searchParams.get("destinationName");
+
+  const activeRoute = persona ? PERSONA_ROUTES[persona] : null;
+  const origin = activeRoute?.origin ?? urlOrigin ?? DEFAULT_ORIGIN;
+  const originName =
+    activeRoute?.oName ?? urlOriginName ?? urlOrigin ?? DEFAULT_ORIGIN_NAME;
+  const destination = activeRoute?.dest ?? urlDest ?? DEFAULT_DEST;
+  const destinationName =
+    activeRoute?.dName ?? urlDestName ?? urlDest ?? DEFAULT_DEST_NAME;
+
   const [data, setData] = useState<CompareResult | null>(null);
   const [cardsData, setCardsData] = useState<CompareCardsResult | null>(null);
+  const [recoveryByTime, setRecoveryByTime] = useState<
+    Record<string, JourneyRecoveryResult | null>
+  >({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [selectedTime, setSelectedTime] = useState<string>(times[0] || "");
+  const [mechanismsOpen, setMechanismsOpen] = useState(false);
 
   const revealRef = useReveal();
+  const mechanismsRef = useRef<HTMLDivElement | null>(null);
+
+  const handleToggleMechanisms = () => {
+    setMechanismsOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        requestAnimationFrame(() => {
+          mechanismsRef.current?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+        });
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!origin || !destination) return;
@@ -72,6 +105,27 @@ function CompareContent() {
       .then(([compare, cards]) => {
         setData(compare);
         setCardsData(cards);
+        // Fetch recovery profiles in parallel (one per departure time) so
+        // OptionCard can show the real "Recovery time" metric. This is
+        // best‑effort — if any call fails we simply leave that slot null.
+        const entries = Object.entries(compare.options);
+        return Promise.all(
+          entries.map(async ([t, j]) => {
+            if (!j || !j.legs?.length) return [t, null] as const;
+            try {
+              const r = await api.getJourneyRecovery(j.legs, t);
+              return [t, r] as const;
+            } catch {
+              return [t, null] as const;
+            }
+          }),
+        );
+      })
+      .then((pairs) => {
+        if (!pairs) return;
+        const map: Record<string, JourneyRecoveryResult | null> = {};
+        for (const [t, r] of pairs) map[t] = r;
+        setRecoveryByTime(map);
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
@@ -92,8 +146,6 @@ function CompareContent() {
       if (opt) cardsByTime[t] = opt.cards;
     }
   }
-
-  const selectedJourney = data?.options[selectedTime] ?? null;
 
   return (
     <div ref={revealRef} className="max-w-6xl mx-auto px-6 pt-20 pb-16">
@@ -210,75 +262,48 @@ function CompareContent() {
                   time={time}
                   index={i}
                   journey={data.options[time]}
-                  origin={origin}
-                  destination={destination}
+                  cards={cardsByTime[time]}
+                  recovery={recoveryByTime[time] ?? null}
                   highlighted={highlightedMetrics}
                 />
               ))}
             </div>
           </section>
 
-          {/* ── Six Comparison Cards ── */}
-          {Object.keys(cardsByTime).length > 0 && (
-            <section className="reveal-section mb-10">
-              <h2 className="text-lg font-semibold mb-2">
-                Trade-off comparison
-              </h2>
-              <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>
-                Six dimensions, side by side. No single score.
-              </p>
-              <ComparisonCards cardsByTime={cardsByTime} times={times} />
+          {/* ── Mechanisms (expands when the middle nav button is clicked) ── */}
+          {mechanismsOpen && (
+            <section
+              ref={mechanismsRef}
+              className="reveal-section mb-10"
+            >
+              <Mechanisms onClose={() => setMechanismsOpen(false)} />
             </section>
           )}
 
-          {/* ── Missed connection simulator ── */}
-          <section className="reveal-section mb-10">
-            <h2 className="text-lg font-semibold mb-4">
-              Recovery: what if you miss a connection?
-            </h2>
-
-            <div className="flex gap-2 mb-4">
-              {times.map((t, i) => (
-                <button
-                  key={t}
-                  className={`tag ${selectedTime === t ? "active" : ""}`}
-                  onClick={() => setSelectedTime(t)}
-                  style={
-                    selectedTime === t
-                      ? { borderColor: TIME_COLORS[i], color: TIME_COLORS[i] }
-                      : undefined
-                  }
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-
-            {selectedJourney && (
-              <MissedConnection legs={selectedJourney.legs} time={selectedTime} />
-            )}
-          </section>
-
-          {/* ── What changes most ── */}
-          <section className="reveal-section card mb-10">
-            <h3 className="font-semibold mb-3">
-              What changes most across time?
-            </h3>
-            <ul className="space-y-2">
-              <li className="text-sm" style={{ color: "var(--text-secondary)" }}>
-                <span style={{ color: "var(--accent-amber)" }}>●</span>{" "}
-                Waiting increases most after 21:00
-              </li>
-              <li className="text-sm" style={{ color: "var(--text-secondary)" }}>
-                <span style={{ color: "var(--accent-amber)" }}>●</span>{" "}
-                Nearby support drops sharply later in the evening
-              </li>
-              <li className="text-sm" style={{ color: "var(--text-secondary)" }}>
-                <span style={{ color: "var(--accent-amber)" }}>●</span>{" "}
-                Later departures are easier to miss and harder to recover from
-              </li>
-            </ul>
-          </section>
+          {/* ── Bottom nav (back / mechanisms / view map) ── */}
+          <div className="refl-nav reveal-section mb-6">
+            <button
+              type="button"
+              className="refl-nav-btn refl-nav-secondary"
+              onClick={() => router.back()}
+            >
+              &larr; Back
+            </button>
+            <button
+              type="button"
+              className={`refl-nav-btn ${mechanismsOpen ? "refl-nav-active" : ""}`}
+              onClick={handleToggleMechanisms}
+              aria-expanded={mechanismsOpen}
+            >
+              {mechanismsOpen ? "Hide Mechanisms" : "Mechanisms"}
+            </button>
+            <Link
+              href="/overview"
+              className="refl-nav-btn refl-nav-secondary"
+            >
+              View map &rarr;
+            </Link>
+          </div>
 
           {/* ── Footer ── */}
           <p

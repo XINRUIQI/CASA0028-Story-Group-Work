@@ -1,38 +1,12 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { PERSONA_DEFS, type PersonaId } from "@/components/PersonaSwitch";
+import {
+  PERSONA_DEFS,
+  PERSONA_ROUTES,
+  type PersonaId,
+} from "@/components/PersonaSwitch";
 import { api } from "@/lib/api";
-
-const PRESET_ROUTES: Record<
-  PersonaId,
-  { origin: string; dest: string; oName: string; dName: string }
-> = {
-  student: {
-    origin: "940GZZLUESQ",
-    dest: "HUBSVS",
-    oName: "Euston Square",
-    dName: "Seven Sisters",
-  },
-  budget: {
-    origin: "940GZZLUSTD",
-    dest: "940GZZLUBXN",
-    oName: "Stratford",
-    dName: "Brixton",
-  },
-  nightworker: {
-    origin: "940GZZLUKSX",
-    dest: "940GZZLUBKG",
-    oName: "King's Cross",
-    dName: "Barking",
-  },
-  unfamiliar: {
-    origin: "940GZZLUPAC",
-    dest: "HUBGNW",
-    oName: "Paddington",
-    dName: "Greenwich",
-  },
-};
 
 const HOURS = [
   "18:00",
@@ -419,11 +393,8 @@ export default function PersonaInsightsPanel({
   };
 
   const [curves, setCurves] = useState<Record<string, HourlyPoint | null>>({});
-  const [fetchedKey, setFetchedKey] = useState("");
 
-  const preset = persona ? PRESET_ROUTES[persona] : null;
-  const routeKey = preset ? `${preset.origin}|${preset.dest}` : "";
-  const loading = !!preset && routeKey !== fetchedKey;
+  const preset = persona ? PERSONA_ROUTES[persona] : null;
 
   useEffect(() => {
     if (!preset) return;
@@ -450,13 +421,6 @@ export default function PersonaInsightsPanel({
           };
         }
         setCurves(pts);
-        setFetchedKey(`${preset.origin}|${preset.dest}`);
-      })
-      .catch(() => {
-        if (!stale) {
-          setCurves({});
-          setFetchedKey(`${preset.origin}|${preset.dest}`);
-        }
       });
     return () => {
       stale = true;
@@ -503,12 +467,8 @@ export default function PersonaInsightsPanel({
           <p className="choose-chart-loading">
             Pick a traveller above to see their hourly burden curves.
           </p>
-        ) : loading ? (
-          <p className="choose-chart-loading">Loading hourly data…</p>
         ) : Object.keys(curves).length === 0 ? (
-          <p className="choose-chart-loading">
-            Start the backend to enable live queries.
-          </p>
+          <p className="choose-chart-loading">Loading hourly data…</p>
         ) : (
           <HourlyLineChart curves={curves} />
         )}
