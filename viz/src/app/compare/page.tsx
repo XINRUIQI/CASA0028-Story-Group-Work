@@ -24,6 +24,9 @@ import {
 } from "@/lib/api";
 
 const TIME_LABELS: Record<string, string> = {
+  "14:00": "Daytime",
+  "19:00": "Evening",
+  "00:00": "Late Night",
   "18:00": "☀️ Daytime",
   "21:00": "🌆 Evening",
   "22:30": "🌙 Late Night",
@@ -38,33 +41,165 @@ const TIME_COLORS = [
   "var(--accent-emerald)",
 ];
 
+const DEFAULT_COMPARE_TIMES = "14:00,19:00,00:00";
+
+const PERSONA_FOCUS_TO_METRICS: Record<string, string[]> = {
+  functional_cost: ["duration", "fare", "walking", "transfers"],
+  waiting_burden: ["waiting"],
+  support_access: ["support"],
+  activity_context: ["activity"],
+  service_uncertainty: ["uncertainty"],
+  safety_exposure: ["safety"],
+};
+
+const DENSE_COMPARE_FALLBACK_TIMES = [
+  "18:00",
+  "19:00",
+  "20:00",
+  "21:00",
+  "22:00",
+  "23:00",
+  "00:00",
+  "01:00",
+  "02:00",
+] as const;
+
 const DEFAULT_ORIGIN = "940GZZLUESQ";
 const DEFAULT_ORIGIN_NAME = "Euston Square";
 const DEFAULT_DEST = "HUBSVS";
 const DEFAULT_DEST_NAME = "Seven Sisters";
 
+async function loadStaticCompareCards(
+  origin: string,
+  destination: string,
+  times: string[],
+): Promise<CompareCardsResult | null> {
+  const encodedTimes = times.join(",").replace(/:/g, "-").replace(/,/g, "_");
+  const path = `/static-data/compare-cards/${destination}__${origin}__${encodedTimes}.json`;
+  try {
+    const response = await fetch(path);
+    if (!response.ok) return null;
+    return (await response.json()) as CompareCardsResult;
+  } catch {
+    return null;
+  }
+}
+
+function mergeCompareCards(
+  requestedTimes: string[],
+  primary: CompareCardsResult | null,
+  fallbacks: Array<CompareCardsResult | null>,
+): CompareCardsResult | null {
+  const sources = [primary, ...fallbacks].filter(Boolean) as CompareCardsResult[];
+  if (sources.length === 0) return null;
+
+  const options = Object.fromEntries(
+    requestedTimes.map((time) => {
+      const matched = sources.find((source) => source.options[time]);
+      return [time, matched?.options[time] ?? null];
+    }),
+  );
+
+  return {
+    origin: primary?.origin ?? sources[0].origin,
+    destination: primary?.destination ?? sources[0].destination,
+    options,
+    note: primary?.note ?? sources[0].note,
+  };
+}
+
+function deriveCompareResult(
+  origin: string,
+  destination: string,
+  times: string[],
+  cards: CompareCardsResult,
+): CompareResult {
+  return {
+    origin,
+    destination,
+    options: Object.fromEntries(
+      times.map((time) => [time, cards.options[time]?.journey ?? null]),
+    ),
+  };
+}
+
+function getPresetPersona(
+  origin?: string | null,
+  destination?: string | null,
+): PersonaId {
+  for (const personaId of Object.keys(PERSONA_ROUTES) as PersonaId[]) {
+    const preset = PERSONA_ROUTES[personaId];
+    if (preset.origin === origin && preset.dest === destination) {
+      return personaId;
+    }
+  }
+  return "student";
+}
+
+function mapThemeForTime(time: string): "day" | "evening" | "night" {
+  const hour = Number(time.split(":")[0] || 0);
+  if (hour >= 22 || hour < 6) return "night";
+  if (hour < 22) return "evening";
+  return "day";
+}
+
+function formatSignedMetric(value: unknown): string | null {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return null;
+  return `${numeric >= 0 ? "+" : ""}${numeric.toFixed(2)}`;
+}
+
+function buildRouteSupportSummary(
+  supportCard?: CardData,
+  activityCard?: CardData,
+): string | undefined {
+  if (!supportCard && !activityCard) return undefined;
+
+  const parts: string[] = [];
+  const supportCount = Number(supportCard?.total_support_open);
+  if (Number.isFinite(supportCount)) {
+    parts.push(`${supportCount} open support places`);
+  }
+
+  const supportIndex = formatSignedMetric(supportCard?.route_support_index);
+  if (supportIndex) {
+    parts.push(`support ${supportIndex}`);
+  }
+
+  const activityIndex = formatSignedMetric(activityCard?.route_activity_index);
+  if (activityIndex) {
+    parts.push(`activity ${activityIndex}`);
+  }
+
+  const venueDensity = Number(activityCard?.route_venue_density);
+  if (Number.isFinite(venueDensity)) {
+    parts.push(`${venueDensity.toFixed(1)} venues/km²`);
+  }
+
+  return parts.length > 0 ? parts.join(" · ") : undefined;
+}
+
 function CompareContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const timesParam = searchParams.get("times") || "18:00,21:00,23:30";
+  const queryOrigin = searchParams.get("origin") || DEFAULT_ORIGIN;
+  const queryOriginName = searchParams.get("originName") || DEFAULT_ORIGIN_NAME;
+  const queryDestination = searchParams.get("destination") || DEFAULT_DEST;
+  const queryDestinationName = searchParams.get("destinationName") || DEFAULT_DEST_NAME;
+  const timesParam = searchParams.get("times") || DEFAULT_COMPARE_TIMES;
   const contextsParam = searchParams.get("contexts") || "";
 
   const times = timesParam.split(",").filter(Boolean);
   const contexts = contextsParam.split(",").filter(Boolean) as ContextTag[];
-  const [persona, setPersona] = useState<PersonaId | null>(null);
+  const [persona, setPersona] = useState<PersonaId>(() =>
+    getPresetPersona(queryOrigin, queryDestination),
+  );
 
-  const urlOrigin = searchParams.get("origin");
-  const urlOriginName = searchParams.get("originName");
-  const urlDest = searchParams.get("destination");
-  const urlDestName = searchParams.get("destinationName");
-
-  const activeRoute = persona ? PERSONA_ROUTES[persona] : null;
-  const origin = activeRoute?.origin ?? urlOrigin ?? DEFAULT_ORIGIN;
-  const originName =
-    activeRoute?.oName ?? urlOriginName ?? urlOrigin ?? DEFAULT_ORIGIN_NAME;
-  const destination = activeRoute?.dest ?? urlDest ?? DEFAULT_DEST;
-  const destinationName =
-    activeRoute?.dName ?? urlDestName ?? urlDest ?? DEFAULT_DEST_NAME;
+  const activeRoute = PERSONA_ROUTES[persona];
+  const origin = activeRoute?.origin ?? queryOrigin;
+  const originName = activeRoute?.oName ?? queryOriginName;
+  const destination = activeRoute?.dest ?? queryDestination;
+  const destinationName = activeRoute?.dName ?? queryDestinationName;
 
   const [data, setData] = useState<CompareResult | null>(null);
   const [cardsData, setCardsData] = useState<CompareCardsResult | null>(null);
@@ -77,6 +212,7 @@ function CompareContent() {
 
   const revealRef = useReveal();
   const mechanismsRef = useRef<HTMLDivElement | null>(null);
+  const compareRequestRef = useRef(0);
 
   const handleToggleMechanisms = () => {
     setMechanismsOpen((prev) => {
@@ -94,50 +230,94 @@ function CompareContent() {
   };
 
   useEffect(() => {
+    setPersona(getPresetPersona(queryOrigin, queryDestination));
+  }, [queryDestination, queryOrigin]);
+
+  useEffect(() => {
     if (!origin || !destination) return;
+    const requestId = compareRequestRef.current + 1;
+    compareRequestRef.current = requestId;
+    const isCurrentRequest = () => compareRequestRef.current === requestId;
+
     setLoading(true);
     setError("");
+    setRecoveryByTime({});
+    setData(null);
+    setCardsData(null);
 
     Promise.all([
-      api.compareJourney(origin, destination, times),
-      api.compareCards(origin, destination, times).catch(() => null),
+      loadStaticCompareCards(origin, destination, times),
+      loadStaticCompareCards(origin, destination, [...DENSE_COMPARE_FALLBACK_TIMES]),
     ])
-      .then(([compare, cards]) => {
-        setData(compare);
-        setCardsData(cards);
-        // Fetch recovery profiles in parallel (one per departure time) so
-        // OptionCard can show the real "Recovery time" metric. This is
-        // best‑effort — if any call fails we simply leave that slot null.
-        const entries = Object.entries(compare.options);
-        return Promise.all(
-          entries.map(async ([t, j]) => {
-            if (!j || !j.legs?.length) return [t, null] as const;
-            try {
-              const r = await api.getJourneyRecovery(j.legs, t);
-              return [t, r] as const;
-            } catch {
-              return [t, null] as const;
+      .then(([staticCards, denseCards]) => {
+        if (!isCurrentRequest()) return;
+
+        const staticMerged = mergeCompareCards(times, staticCards, [denseCards]);
+
+        const loadRecoveryProfiles = (compare: CompareResult) => {
+          const entries = Object.entries(compare.options);
+          if (entries.length === 0) return Promise.resolve();
+
+          return Promise.all(
+            entries.map(async ([t, j]) => {
+              if (!j || !j.legs?.length) return [t, null] as const;
+              try {
+                const r = await api.getJourneyRecovery(j.legs, t);
+                return [t, r] as const;
+              } catch {
+                return [t, null] as const;
+              }
+            }),
+          ).then((pairs) => {
+            if (!isCurrentRequest()) return;
+            const map: Record<string, JourneyRecoveryResult | null> = {};
+            for (const [t, r] of pairs) map[t] = r;
+            setRecoveryByTime(map);
+          });
+        };
+
+        if (staticMerged) {
+          const staticCompare = deriveCompareResult(origin, destination, times, staticMerged);
+          setCardsData(staticMerged);
+          setData(staticCompare);
+          setLoading(false);
+          void loadRecoveryProfiles(staticCompare);
+        }
+
+        return api.compareCards(origin, destination, times)
+          .then((liveCards) => {
+            if (!isCurrentRequest()) return;
+
+            const merged = mergeCompareCards(times, liveCards, [staticCards, denseCards]);
+            if (!merged) {
+              throw new Error("Could not load comparison data for this journey.");
             }
-          }),
-        );
+
+            const compare = deriveCompareResult(origin, destination, times, merged);
+            setCardsData(merged);
+            setData(compare);
+            setLoading(false);
+            void loadRecoveryProfiles(compare);
+          })
+          .catch(() => {
+            if (!isCurrentRequest()) return;
+            if (!staticMerged) {
+              throw new Error("Could not load comparison data for this journey.");
+            }
+          });
       })
-      .then((pairs) => {
-        if (!pairs) return;
-        const map: Record<string, JourneyRecoveryResult | null> = {};
-        for (const [t, r] of pairs) map[t] = r;
-        setRecoveryByTime(map);
-      })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+      .catch((e) => {
+        if (!isCurrentRequest()) return;
+        setError(e.message);
+        setLoading(false);
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [origin, destination, timesParam]);
 
-  const activeDef = persona
-    ? PERSONA_DEFS.find((p) => p.id === persona) ?? null
-    : null;
-  const highlightedMetrics = activeDef
-    ? activeDef.focusDimensions.map((d) => d.replace(/_/g, " ").split(" ")[0])
-    : [];
+  const activeDef = PERSONA_DEFS.find((p) => p.id === persona)!;
+  const highlightedMetrics = activeDef.focusDimensions.flatMap(
+    (dimension) => PERSONA_FOCUS_TO_METRICS[dimension] ?? [],
+  );
 
   const cardsByTime: Record<string, Record<string, CardData> | undefined> = {};
   if (cardsData) {
@@ -168,7 +348,9 @@ function CompareContent() {
       <section className="reveal-section mb-8">
         <PersonaInsightsPanel
           persona={persona}
-          onPersonaChange={setPersona}
+          onPersonaChange={(nextPersona) => {
+            if (nextPersona) setPersona(nextPersona);
+          }}
         />
       </section>
 
@@ -227,7 +409,9 @@ function CompareContent() {
               {times.map((t, i) => {
                 const j = data.options[t];
                 if (!j) return null;
-                const supportOpen = cardsData?.options[t]?.cards?.support_access?.total_support_open;
+                const supportCard = cardsData?.options[t]?.cards?.support_access;
+                const activityCard = cardsData?.options[t]?.cards?.activity_context;
+                const supportOpen = supportCard?.total_support_open;
                 return (
                   <RouteMap
                     key={t}
@@ -235,6 +419,8 @@ function CompareContent() {
                     label={TIME_LABELS[t] || t}
                     accent={TIME_COLORS[i % TIME_COLORS.length]}
                     supportCount={supportOpen != null ? Number(supportOpen) : undefined}
+                    supportSummary={buildRouteSupportSummary(supportCard, activityCard)}
+                    theme={mapThemeForTime(t)}
                   />
                 );
               })}
@@ -265,6 +451,8 @@ function CompareContent() {
                   cards={cardsByTime[time]}
                   recovery={recoveryByTime[time] ?? null}
                   highlighted={highlightedMetrics}
+                  origin={origin}
+                  destination={destination}
                 />
               ))}
             </div>

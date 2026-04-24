@@ -1,13 +1,18 @@
 "use client";
 
 import type { CardData, Journey, JourneyRecoveryResult } from "@/lib/api";
+import Link from "next/link";
 import {
+  Clock,
+  Footprints,
+  ArrowLeftRight,
   Timer,
   ShieldCheck,
   HelpCircle,
-  Lightbulb,
   LifeBuoy,
   AlertTriangle,
+  Coins,
+  Activity,
 } from "lucide-react";
 
 interface OptionCardProps {
@@ -17,6 +22,8 @@ interface OptionCardProps {
   cards?: Record<string, CardData>;
   recovery?: JourneyRecoveryResult | null;
   highlighted?: string[];
+  origin?: string;
+  destination?: string;
 }
 
 const LETTER = ["A", "B", "C", "D"];
@@ -31,15 +38,15 @@ interface WaitingBurdenCard {
 interface SupportAccessCard {
   total_support_open?: number;
   total_support_all?: number;
+  route_support_index?: number;
 }
 interface ServiceUncertaintyCard {
   uncertainty_score_pct?: number;
   uncertainty_label?: string;
   mean_headway_gap_ratio?: number | null;
 }
-interface LightingProxyCard {
-  label?: string;
-  mean_lamps_per_walk?: number;
+interface ActivityContextCard {
+  route_activity_index?: number;
 }
 interface SafetyExposureCard {
   safety_exposure_pct?: number | null;
@@ -62,23 +69,6 @@ function titleCase(s?: string | null): string {
     .join(" ");
 }
 
-/**
- * Map a qualitative label ("low" | "moderate" | "high" | "very high",
- * "easy" | "manageable" | "difficult" | "very difficult", etc.) to a
- * tone bucket the UI uses for color.
- */
-function toneFromLabel(label?: string | null): "good" | "warn" | "bad" {
-  const s = (label || "").toLowerCase();
-  if (["low", "lower", "easy", "high resilience", "high"].includes(s)) {
-    // "high" on resilience = good, but "high" on uncertainty = bad.
-    // We pick tone from the specific metric — see below; this is just fallback.
-    return "good";
-  }
-  if (s.includes("moderate") || s.includes("manageable")) return "warn";
-  if (s.includes("very") || s === "bad" || s === "low")  return "bad";
-  if (s.includes("difficult") || s === "sparse") return "bad";
-  return "warn";
-}
 
 // Tone for metrics where "high value = bad" (uncertainty, safety exposure).
 function toneByScore(pct?: number | null): "good" | "warn" | "bad" {
@@ -104,14 +94,6 @@ function toneBySupport(open?: number | null): "good" | "warn" | "bad" {
   return "bad";
 }
 
-// Tone for lighting label.
-function toneByLighting(label?: string): "good" | "warn" | "bad" {
-  if (!label) return "warn";
-  if (label.startsWith("well")) return "good";
-  if (label.startsWith("moderate")) return "warn";
-  return "bad"; // sparse / none
-}
-
 // Tone for recovery resilience.
 function toneByResilience(label?: string): "good" | "warn" | "bad" {
   if (!label) return "warn";
@@ -129,6 +111,8 @@ export default function OptionCard({
   cards,
   recovery,
   highlighted = [],
+  origin,
+  destination,
 }: OptionCardProps) {
   if (!journey) {
     return (
@@ -146,17 +130,49 @@ export default function OptionCard({
   const wb = (cards?.waiting_burden ?? {}) as WaitingBurdenCard & CardData;
   const sa = (cards?.support_access ?? {}) as SupportAccessCard & CardData;
   const su = (cards?.service_uncertainty ?? {}) as ServiceUncertaintyCard & CardData;
-  const lp = (cards?.lighting_proxy ?? {}) as LightingProxyCard & CardData;
+  const ac = (cards?.activity_context ?? {}) as ActivityContextCard & CardData;
   const se = (cards?.safety_exposure ?? {}) as SafetyExposureCard & CardData;
 
   const metrics = [
     {
+      key: "duration",
+      icon: <Clock size={14} />,
+      label: "Total time",
+      value: `${journey.duration_min} min`,
+      tone: toneByMinutes(journey.duration_min, 60, 35),
+      source: "functional_cost",
+    },
+    {
+      key: "fare",
+      icon: <Coins size={14} />,
+      label: "Fare",
+      value: journey.fare != null ? `£${(journey.fare / 100).toFixed(2)}` : "—",
+      tone: "warn" as const,
+      source: "functional_cost",
+    },
+    {
+      key: "walking",
+      icon: <Footprints size={14} />,
+      label: "Walking (est.)",
+      value: `~${Math.round(journey.walk_distance_m)} m`,
+      tone: toneByMinutes(journey.walk_distance_m / 80, 12, 6),
+      source: "functional_cost",
+    },
+    {
+      key: "transfers",
+      icon: <ArrowLeftRight size={14} />,
+      label: "Transfers",
+      value: String(journey.transfers),
+      tone: journey.transfers >= 3 ? "bad" : journey.transfers >= 2 ? "warn" : "good",
+      source: "functional_cost",
+    },
+    {
       key: "waiting",
       icon: <Timer size={14} />,
-      label: "Waiting Time at stations",
+      label: "Waiting burden",
       value:
         wb.total_expected_wait_min != null
-          ? `${formatNum(wb.total_expected_wait_min, 1)} min`
+          ? `~${formatNum(wb.total_expected_wait_min, 1)} min`
           : "—",
       sub:
         wb.max_single_wait_min != null
@@ -174,14 +190,34 @@ export default function OptionCard({
           ? `${sa.total_support_open} open`
           : "—",
       sub:
-        sa.total_support_all != null
-          ? `of ${sa.total_support_all} within 300 m`
-          : undefined,
+        sa.route_support_index != null
+          ? `Index ${formatNum(sa.route_support_index, 2)}`
+          : sa.total_support_all != null
+            ? `of ${sa.total_support_all} within 300 m`
+            : undefined,
       tone: toneBySupport(sa.total_support_open),
       source: "support_access",
     },
     {
-      key: "service",
+      key: "activity",
+      icon: <Activity size={14} />,
+      label: "Activity context",
+      value:
+        ac.route_activity_index != null
+          ? `Index ${formatNum(ac.route_activity_index, 2)}`
+          : "—",
+      tone:
+        ac.route_activity_index != null
+          ? Number(ac.route_activity_index) >= 0.5
+            ? "good"
+            : Number(ac.route_activity_index) >= 0.2
+              ? "warn"
+              : "bad"
+          : "warn",
+      source: "activity_context",
+    },
+    {
+      key: "uncertainty",
       icon: <HelpCircle size={14} />,
       label: "Service uncertainty",
       value: titleCase(su.uncertainty_label),
@@ -191,18 +227,6 @@ export default function OptionCard({
           : undefined,
       tone: toneByScore(su.uncertainty_score_pct),
       source: "service_uncertainty",
-    },
-    {
-      key: "lighting",
-      icon: <Lightbulb size={14} />,
-      label: "Lighting proxy",
-      value: titleCase(lp.label),
-      sub:
-        lp.mean_lamps_per_walk != null
-          ? `${formatNum(lp.mean_lamps_per_walk, 1)} lamps / walk`
-          : undefined,
-      tone: toneByLighting(lp.label),
-      source: "lighting_proxy",
     },
     {
       key: "recovery",
@@ -224,7 +248,7 @@ export default function OptionCard({
     {
       key: "safety",
       icon: <AlertTriangle size={14} />,
-      label: "Safety Exposure Level",
+      label: "Safety exposure",
       value: titleCase(se.exposure_label),
       sub:
         se.safety_exposure_pct != null
@@ -291,6 +315,17 @@ export default function OptionCard({
           );
         })}
       </div>
+
+      {origin && destination && (
+        <div className="mt-auto flex flex-col gap-2">
+          <Link
+            href={`/unpack?origin=${origin}&destination=${destination}&time=${time}`}
+            className="btn-secondary text-center text-sm"
+          >
+            View journey breakdown
+          </Link>
+        </div>
+      )}
 
     </div>
   );

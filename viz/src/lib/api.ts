@@ -16,13 +16,17 @@ function staticKey(path: string, params?: Record<string, string>): string | null
   return `${dir}/${vals}.json`;
 }
 
-async function fetchJSON<T>(path: string, params?: Record<string, string>): Promise<T> {
+async function fetchJSON<T>(
+  path: string,
+  params?: Record<string, string>,
+  timeoutMs = 10_000,
+): Promise<T> {
   const url = new URL(path, API_BASE);
   if (params) {
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   }
   try {
-    const res = await fetch(url.toString(), { signal: AbortSignal.timeout(10_000) });
+    const res = await fetch(url.toString(), { signal: AbortSignal.timeout(timeoutMs) });
     if (!res.ok) throw new Error(`API error ${res.status}: ${res.statusText}`);
     return res.json();
   } catch (liveErr) {
@@ -228,7 +232,7 @@ export const api = {
       origin,
       destination,
       times: times.join(","),
-    });
+    }, 40_000);
   },
 
   getRouteSupport(legs: Leg[], time?: string) {

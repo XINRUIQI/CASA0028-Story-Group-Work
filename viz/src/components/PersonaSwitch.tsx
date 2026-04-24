@@ -42,9 +42,9 @@ export const PERSONA_ROUTES: Record<PersonaId, PersonaRoute> = {
     dName: "Barking",
   },
   unfamiliar: {
-    origin: "940GZZLUPAC",
-    dest: "HUBGNW",
-    oName: "Paddington",
+    origin: "940GZZLULVT",
+    dest: "940GZZDLGRE",
+    oName: "Liverpool Street",
     dName: "Greenwich",
   },
 };
