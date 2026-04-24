@@ -1,593 +1,791 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import {
-  Timer,
-  ShieldCheck,
-  Route,
-  Activity,
-  Lightbulb,
-} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { api, type FairnessZone } from "@/lib/api";
 
-const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
-const CENTER: [number, number] = [-0.118, 51.509];
+const MAPBOX_TOKEN =
+  process.env.NEXT_PUBLIC_MAPBOX_TOKEN ||
+  "pk.eyJ1IjoibGV2aW5lbGl1IiwiYSI6ImNta21vc3doOTBleGYza3IycDNsOXRidXQifQ.SdtOnvfZEml6QGLmnnduDQ";
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
+const FAIRNESS_DATA_VERSION = "20260424-1";
 const GEOJSON_URL = `${BASE_PATH}/london-boroughs.geojson`;
+const DATA_URL = `${BASE_PATH}/static-data/fairness-explainability.json?v=${FAIRNESS_DATA_VERSION}`;
+const CENTER: [number, number] = [-0.118, 51.509];
 
-type LayerId =
-  | "waiting_burden_increase"
-  | "support_access_loss"
-  | "recovery_difficulty_increase"
-  | "activity_decline"
-  | "low_light_walking_burden";
+type FairnessMetric =
+  | "mismatch_hotspots"
+  | "activity_footprint"
+  | "support_coverage";
 
-interface LayerDef {
-  id: LayerId;
+interface LayerMeta {
   label: string;
-  icon: React.ReactNode;
   accent: string;
-  unit: string;
   description: string;
 }
 
-const LAYERS: LayerDef[] = [
-  {
-    id: "waiting_burden_increase",
-    label: "Waiting burden increase",
-    icon: <Timer size={14} />,
-    accent: "var(--accent-rose)",
-    unit: "min headway",
-    description: "How much longer passengers wait at night compared to daytime.",
-  },
-  {
-    id: "support_access_loss",
-    label: "Support access loss",
-    icon: <ShieldCheck size={14} />,
-    accent: "var(--accent-emerald)",
-    unit: "open POIs",
-    description: "How many support facilities close after dark in each area.",
-  },
-  {
-    id: "recovery_difficulty_increase",
-    label: "Recovery difficulty",
-    icon: <Route size={14} />,
-    accent: "var(--champagne-gold)",
-    unit: "fallback routes",
-    description: "How much harder it becomes to recover from a missed connection.",
-  },
-  {
-    id: "activity_decline",
-    label: "Activity decline",
-    icon: <Activity size={14} />,
+interface BoroughMetric {
+  bucket: "Inner" | "Outer";
+  msoa_count: number;
+  activity_index_mean: number;
+  support_index_mean: number;
+  supply_change_mean: number;
+  supply_change_spread: number;
+  activity_footprint: number;
+  activity_footprint_count: number;
+  support_coverage: number;
+  support_coverage_count: number;
+  mismatch_hotspots: number;
+  mismatch_hotspots_count: number;
+}
+
+interface AudienceShiftItem {
+  dimension: string;
+  category: string;
+  label: string;
+  day_share: number;
+  night_share: number;
+  delta: number;
+}
+
+interface InnerOuterItem {
+  metric: string;
+  label: string;
+  inner: number;
+  outer: number;
+}
+
+interface HighlightItem {
+  title: string;
+  value: string;
+  detail: string;
+}
+
+interface CommuteSnapshot {
+  outer_to_outer: number;
+  outer_to_inner: number;
+  inner_to_inner: number;
+  narrative: string;
+}
+
+interface FairnessExplainability {
+  layerMeta: Record<FairnessMetric, LayerMeta>;
+  thresholds?: Record<string, number>;
+  boroughs: Record<string, BoroughMetric>;
+  audienceShift: AudienceShiftItem[];
+  innerOuter: InnerOuterItem[];
+  commuteSnapshot: CommuteSnapshot;
+  highlights: HighlightItem[];
+  method: string[];
+}
+
+const DEFAULT_THRESHOLDS = {
+  activity_footprint_min: 0.05,
+  support_coverage_min: 0.12,
+  mismatch_activity_min: 0.03,
+  mismatch_support_max: 0.09,
+} as const;
+
+const DEFAULT_LAYER_META: Record<FairnessMetric, LayerMeta> = {
+  mismatch_hotspots: {
+    label: "Activity-support mismatch",
     accent: "var(--accent-amber)",
-    unit: "activity ratio",
-    description: "How much the 'someone is around' presence fades at night.",
+    description: "Share of MSOAs where late-night activity remains visible but support stays thin.",
   },
-  {
-    id: "low_light_walking_burden",
-    label: "Low-light walking burden",
-    icon: <Lightbulb size={14} />,
-    accent: "var(--champagne-gold)",
-    unit: "lit share",
-    description: "Night walking burden in areas with less lighting infrastructure.",
+  activity_footprint: {
+    label: "Night activity footprint",
+    accent: "var(--accent-blue)",
+    description: "Share of MSOAs that still clear the activity threshold after dark.",
   },
-];
+  support_coverage: {
+    label: "Support coverage",
+    accent: "var(--accent-emerald)",
+    description: "Share of MSOAs where support intensity still clears a meaningful threshold.",
+  },
+};
 
-const INNER_BOROUGHS = new Set([
-  "Camden", "City of London", "Greenwich", "Hackney", "Hammersmith and Fulham",
-  "Islington", "Kensington and Chelsea", "Lambeth", "Lewisham", "Newham",
-  "Southwark", "Tower Hamlets", "Wandsworth", "Westminster",
-]);
-
-function dropColor(ratio: number): string {
-  const t = Math.min(Math.max(Math.abs(ratio), 0), 0.8) / 0.8;
-  const r = Math.round(50 + t * 151);
-  const g = Math.round(48 + t * 121);
-  const b = Math.round(60 + t * 50);
-  return `rgb(${r},${g},${b})`;
+function toNumber(value: unknown, fallback = 0): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
-function dropLabel(drop: number): { text: string; color: string } {
-  const abs = Math.abs(drop);
-  if (abs >= 0.7) return { text: "Large gap", color: "var(--accent-amber)" };
-  if (abs >= 0.4) return { text: "Notable gap", color: "var(--champagne-gold)" };
-  if (abs >= 0.15) return { text: "Moderate gap", color: "var(--text-secondary)" };
-  return { text: "Minimal change", color: "var(--accent-emerald)" };
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object";
 }
 
-/** Extract borough name from MSOA name (e.g. "Camden 016" → "camden") */
-function extractBorough(msoaName: string): string {
-  const trimmed = msoaName.trim();
-  const parts = trimmed.split(/\s+/);
-  if (parts.length >= 2 && /^\d{3}$/.test(parts[parts.length - 1])) {
-    return parts.slice(0, -1).join(" ").toLowerCase();
-  }
-  return trimmed.toLowerCase();
-}
+function normalizeFairnessPayload(raw: unknown): FairnessExplainability {
+  const payload = isRecord(raw) ? raw : {};
+  const rawLayerMeta = payload.layerMeta && typeof payload.layerMeta === "object"
+    ? payload.layerMeta as Record<string, Record<string, unknown>>
+    : {};
+  const rawThresholds = payload.thresholds && typeof payload.thresholds === "object"
+    ? payload.thresholds as Record<string, unknown>
+    : {};
+  const rawBoroughs = payload.boroughs && typeof payload.boroughs === "object"
+    ? payload.boroughs as Record<string, Record<string, unknown>>
+    : {};
 
-/** Aggregate MSOA zones to borough level, then merge into GeoJSON */
-function mergeGeoWithZones(
-  geo: GeoJSON.FeatureCollection,
-  zoneData: Record<string, FairnessZone>,
-): GeoJSON.FeatureCollection {
-  const boroughBuckets: Record<string, FairnessZone[]> = {};
-  for (const z of Object.values(zoneData)) {
-    const borough = extractBorough(z.name);
-    if (!boroughBuckets[borough]) boroughBuckets[borough] = [];
-    boroughBuckets[borough].push(z);
-  }
+  const boroughs = Object.fromEntries(
+    Object.entries(rawBoroughs).map(([name, borough]) => {
+      const activityFootprint = toNumber(
+        borough.activity_footprint,
+        toNumber(borough.dependence),
+      );
+      const supportCoverage = toNumber(
+        borough.support_coverage,
+        toNumber(borough.support_score, Math.max(0, 1 - toNumber(borough.burden))),
+      );
+      const mismatchHotspots = toNumber(
+        borough.mismatch_hotspots,
+        toNumber(borough.mismatch),
+      );
+      const msoaCount = Math.max(1, Math.round(toNumber(borough.msoa_count, 1)));
 
-  const boroughAgg: Record<string, { drop: number; day: number; night: number }> = {};
-  for (const [borough, list] of Object.entries(boroughBuckets)) {
-    const n = list.length;
-    boroughAgg[borough] = {
-      drop: list.reduce((s, z) => s + z.drop_ratio, 0) / n,
-      day: list.reduce((s, z) => s + z.day_value, 0) / n,
-      night: list.reduce((s, z) => s + z.night_value, 0) / n,
-    };
-  }
+      return [
+        name,
+        {
+          bucket: borough.bucket === "Inner" ? "Inner" : "Outer",
+          msoa_count: msoaCount,
+          activity_index_mean: toNumber(
+            borough.activity_index_mean,
+            toNumber(borough.activity_index),
+          ),
+          support_index_mean: toNumber(
+            borough.support_index_mean,
+            toNumber(borough.support_index),
+          ),
+          supply_change_mean: toNumber(
+            borough.supply_change_mean,
+            toNumber(borough.supply_change),
+          ),
+          supply_change_spread: toNumber(borough.supply_change_spread),
+          activity_footprint: activityFootprint,
+          activity_footprint_count: Math.round(
+            toNumber(borough.activity_footprint_count, activityFootprint * msoaCount),
+          ),
+          support_coverage: supportCoverage,
+          support_coverage_count: Math.round(
+            toNumber(borough.support_coverage_count, supportCoverage * msoaCount),
+          ),
+          mismatch_hotspots: mismatchHotspots,
+          mismatch_hotspots_count: Math.round(
+            toNumber(borough.mismatch_hotspots_count, mismatchHotspots * msoaCount),
+          ),
+        } satisfies BoroughMetric,
+      ];
+    }),
+  ) as Record<string, BoroughMetric>;
+
+  const highlights = Array.isArray(payload.highlights)
+    ? payload.highlights.filter(isRecord).map((item) => ({
+      title: String(item.title || ""),
+      value: String(item.value || ""),
+      detail: String(item.detail || ""),
+    }))
+    : [];
+
+  const audienceShift = Array.isArray(payload.audienceShift)
+    ? payload.audienceShift.filter(isRecord).map((item) => ({
+      dimension: String(item.dimension || ""),
+      category: String(item.category || ""),
+      label: String(item.label || ""),
+      day_share: toNumber(item.day_share),
+      night_share: toNumber(item.night_share),
+      delta: toNumber(item.delta),
+    }))
+    : [];
+
+  const innerOuter = Array.isArray(payload.innerOuter)
+    ? payload.innerOuter.filter(isRecord).map((item) => ({
+      metric: String(item.metric || ""),
+      label: String(item.label || ""),
+      inner: toNumber(item.inner),
+      outer: toNumber(item.outer),
+    }))
+    : [];
+
+  const commuteRaw = isRecord(payload.commuteSnapshot)
+    ? payload.commuteSnapshot
+    : {};
+
+  const thresholds = {
+    ...DEFAULT_THRESHOLDS,
+    activity_footprint_min: toNumber(rawThresholds.activity_footprint_min, DEFAULT_THRESHOLDS.activity_footprint_min),
+    support_coverage_min: toNumber(rawThresholds.support_coverage_min, DEFAULT_THRESHOLDS.support_coverage_min),
+    mismatch_activity_min: toNumber(rawThresholds.mismatch_activity_min, DEFAULT_THRESHOLDS.mismatch_activity_min),
+    mismatch_support_max: toNumber(rawThresholds.mismatch_support_max, DEFAULT_THRESHOLDS.mismatch_support_max),
+  };
 
   return {
+    layerMeta: {
+      mismatch_hotspots: {
+        ...DEFAULT_LAYER_META.mismatch_hotspots,
+        ...(rawLayerMeta.mismatch_hotspots || {}),
+      },
+      activity_footprint: {
+        ...DEFAULT_LAYER_META.activity_footprint,
+        ...(rawLayerMeta.activity_footprint || rawLayerMeta.dependence || {}),
+      },
+      support_coverage: {
+        ...DEFAULT_LAYER_META.support_coverage,
+        ...(rawLayerMeta.support_coverage || rawLayerMeta.burden || {}),
+      },
+    },
+    thresholds,
+    boroughs,
+    audienceShift,
+    innerOuter,
+    commuteSnapshot: {
+      outer_to_outer: toNumber(commuteRaw.outer_to_outer),
+      outer_to_inner: toNumber(commuteRaw.outer_to_inner),
+      inner_to_inner: toNumber(commuteRaw.inner_to_inner),
+      narrative: String(commuteRaw.narrative || ""),
+    },
+    highlights,
+    method: Array.isArray(payload.method) ? payload.method.map((item) => String(item)) : [],
+  };
+}
+
+interface MetricScale {
+  breaks: number[];
+  min: number;
+  max: number;
+}
+
+const METRIC_ORDER: FairnessMetric[] = [
+  "mismatch_hotspots",
+  "activity_footprint",
+  "support_coverage",
+];
+
+const METRIC_COUNT_KEYS: Record<
+  FairnessMetric,
+  keyof BoroughMetric
+> = {
+  mismatch_hotspots: "mismatch_hotspots_count",
+  activity_footprint: "activity_footprint_count",
+  support_coverage: "support_coverage_count",
+};
+
+const METRIC_PALETTES: Record<FairnessMetric, string[]> = {
+  mismatch_hotspots: [
+    "#3e3220",
+    "#72572a",
+    "#a67b2e",
+    "#c9a96e",
+    "#f1d8a6",
+  ],
+  activity_footprint: [
+    "#1d3445",
+    "#30506b",
+    "#467394",
+    "#66a1c4",
+    "#a8d6ee",
+  ],
+  support_coverage: [
+    "#11362e",
+    "#1d5b4d",
+    "#2e7a65",
+    "#4ea387",
+    "#9cd4b9",
+  ],
+};
+
+function clamp(value: number, low = 0, high = 1) {
+  return Math.min(high, Math.max(low, value));
+}
+
+function formatPct(value: number) {
+  return `${Math.round(value * 100)}%`;
+}
+
+function quantileBreaks(values: number[]): MetricScale {
+  const sorted = [...values].sort((left, right) => left - right);
+  const pick = (quantile: number) =>
+    sorted[Math.min(sorted.length - 1, Math.floor((sorted.length - 1) * quantile))] ?? 0;
+
+  return {
+    breaks: [pick(0.2), pick(0.4), pick(0.6), pick(0.8)],
+    min: sorted[0] ?? 0,
+    max: sorted[sorted.length - 1] ?? 0,
+  };
+}
+
+function steppedColor(metric: FairnessMetric, value: number, scale: MetricScale) {
+  const palette = METRIC_PALETTES[metric];
+  let index = scale.breaks.findIndex((threshold) => value <= threshold);
+  if (index === -1) index = palette.length - 1;
+  return palette[Math.min(index, palette.length - 1)];
+}
+
+function mergeGeoWithMetric(
+  geo: GeoJSON.FeatureCollection,
+  boroughs: Record<string, BoroughMetric>,
+  metric: FairnessMetric,
+  scale: MetricScale,
+): GeoJSON.FeatureCollection {
+  const countKey = METRIC_COUNT_KEYS[metric];
+  return {
     type: "FeatureCollection",
-    features: geo.features.map((f) => {
-      const name = (f.properties?.name || "").toLowerCase();
-      const agg = boroughAgg[name];
+    features: geo.features.map((feature) => {
+      const name = String(feature.properties?.name || "");
+      const borough = boroughs[name];
+      const score = borough?.[metric] ?? 0;
+      const count = borough?.[countKey] ?? 0;
       return {
-        ...f,
+        ...feature,
         properties: {
-          ...f.properties,
-          drop_ratio: agg ? Math.abs(agg.drop) : 0,
-          day_value: agg ? agg.day : 0,
-          night_value: agg ? agg.night : 0,
-          fill_color: agg ? dropColor(agg.drop) : "rgba(40,50,90,0.5)",
+          ...feature.properties,
+          score,
+          count,
+          fill_color: steppedColor(metric, score, scale),
+          bucket: borough?.bucket || "Outer",
+          msoa_count: borough?.msoa_count ?? 0,
+          activity_index_mean: borough?.activity_index_mean ?? 0,
+          support_index_mean: borough?.support_index_mean ?? 0,
+          supply_change_mean: borough?.supply_change_mean ?? 0,
+          supply_change_spread: borough?.supply_change_spread ?? 0,
+          activity_footprint: borough?.activity_footprint ?? 0,
+          support_coverage: borough?.support_coverage ?? 0,
+          mismatch_hotspots: borough?.mismatch_hotspots ?? 0,
         },
       };
     }),
   };
 }
 
-const EMPTY_FC: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
+function AudienceShiftChart({ items }: { items: AudienceShiftItem[] }) {
+  const width = 620;
+  const rowHeight = 44;
+  const height = items.length * rowHeight + 28;
+  const left = 168;
+  const right = width - 54;
+  const maxValue = Math.max(
+    ...items.map((item) => Math.max(item.day_share, item.night_share)),
+    0.65,
+  );
+  const scale = (value: number) => left + (value / maxValue) * (right - left);
 
-/* ── Main component ── */
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} className="fairness-v2-svg">
+      <text x={left} y={18} className="fairness-v2-axis-label">Day</text>
+      <text x={right - 4} y={18} textAnchor="end" className="fairness-v2-axis-label">Night</text>
+      {items.map((item, index) => {
+        const y = 42 + index * rowHeight;
+        const dayX = scale(item.day_share);
+        const nightX = scale(item.night_share);
+        const positive = item.delta >= 0;
+        return (
+          <g key={item.label}>
+            <text x={0} y={y + 4} className="fairness-v2-row-label">{item.label}</text>
+            <line
+              x1={left}
+              y1={y}
+              x2={right}
+              y2={y}
+              stroke="rgba(255,255,255,0.06)"
+              strokeWidth="1"
+            />
+            <line
+              x1={dayX}
+              y1={y}
+              x2={nightX}
+              y2={y}
+              stroke={positive ? "var(--accent-amber)" : "var(--accent-blue)"}
+              strokeWidth="3"
+              strokeLinecap="round"
+            />
+            <circle cx={dayX} cy={y} r="5" fill="var(--text-muted)" />
+            <circle cx={nightX} cy={y} r="6" fill={positive ? "var(--accent-amber)" : "var(--accent-blue)"} />
+            <text x={dayX} y={y - 10} textAnchor="middle" className="fairness-v2-value-label">
+              {formatPct(item.day_share)}
+            </text>
+            <text x={nightX} y={y - 10} textAnchor="middle" className="fairness-v2-value-label">
+              {formatPct(item.night_share)}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function InnerOuterSlopeChart({ items }: { items: InnerOuterItem[] }) {
+  const width = 520;
+  const height = items.length * 62 + 30;
+  const leftX = 150;
+  const rightX = width - 74;
+  const scale = (value: number) => height - 28 - value * (height - 72);
+
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} className="fairness-v2-svg">
+      <text x={leftX} y={20} textAnchor="middle" className="fairness-v2-axis-label">Inner</text>
+      <text x={rightX} y={20} textAnchor="middle" className="fairness-v2-axis-label">Outer</text>
+      {items.map((item, index) => {
+        const yInner = scale(item.inner);
+        const yOuter = scale(item.outer);
+        const rowTop = 34 + index * 62;
+        return (
+          <g key={item.metric}>
+            <text x={0} y={rowTop + 12} className="fairness-v2-row-label">{item.label}</text>
+            <line x1={leftX} y1={rowTop + 6} x2={leftX} y2={rowTop + 52} stroke="rgba(255,255,255,0.08)" />
+            <line x1={rightX} y1={rowTop + 6} x2={rightX} y2={rowTop + 52} stroke="rgba(255,255,255,0.08)" />
+            <line x1={leftX} y1={yInner} x2={rightX} y2={yOuter} stroke="var(--champagne-gold)" strokeWidth="3" strokeLinecap="round" />
+            <circle cx={leftX} cy={yInner} r="6" fill="var(--accent-blue)" />
+            <circle cx={rightX} cy={yOuter} r="6" fill="var(--accent-rose)" />
+            <text x={leftX} y={yInner - 10} textAnchor="middle" className="fairness-v2-value-label">{formatPct(item.inner)}</text>
+            <text x={rightX} y={yOuter - 10} textAnchor="middle" className="fairness-v2-value-label">{formatPct(item.outer)}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function BoroughRankingChart({
+  rows,
+  metric,
+}: {
+  rows: Array<[string, BoroughMetric]>;
+  metric: FairnessMetric;
+}) {
+  const top = rows.slice(0, 8);
+  const maxScore = Math.max(...top.map(([, value]) => value[metric]), 1);
+  const countKey = METRIC_COUNT_KEYS[metric];
+
+  return (
+    <div className="fairness-v2-ranking">
+      {top.map(([name, value]) => (
+        <div key={name} className="fairness-v2-ranking-row">
+          <div>
+            <div className="fairness-v2-ranking-name">{name}</div>
+            <div className="fairness-v2-ranking-meta">
+              {value.bucket} London · {value[countKey]}/{value.msoa_count} MSOAs
+            </div>
+          </div>
+          <div className="fairness-v2-ranking-track">
+            <div
+              className="fairness-v2-ranking-fill"
+              style={{
+                width: `${(value[metric] / maxScore) * 100}%`,
+                background: steppedColor(metric, value[metric], {
+                  breaks: [maxScore * 0.2, maxScore * 0.4, maxScore * 0.6, maxScore * 0.8],
+                  min: 0,
+                  max: maxScore,
+                }),
+              }}
+            />
+          </div>
+          <div className="fairness-v2-ranking-value">{formatPct(value[metric])}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function FairnessPanel() {
-  const [activeLayer, setActiveLayer] = useState<LayerId>("support_access_loss");
-  const [zones, setZones] = useState<Record<string, FairnessZone>>({});
-  const [fetchedLayer, setFetchedLayer] = useState<string>("");
-  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const [data, setData] = useState<FairnessExplainability | null>(null);
+  const [activeMetric, setActiveMetric] = useState<FairnessMetric>("mismatch_hotspots");
+  const [error, setError] = useState("");
+  const [geojson, setGeojson] = useState<GeoJSON.FeatureCollection | null>(null);
+  const [ready, setReady] = useState(false);
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
-  const readyRef = useRef(false);
-  const geoRef = useRef<GeoJSON.FeatureCollection | null>(null);
-  const zonesRef = useRef<Record<string, FairnessZone>>({});
-  const loading = activeLayer !== fetchedLayer;
+  const popupRef = useRef<mapboxgl.Popup | null>(null);
+  const activeMetricRef = useRef<FairnessMetric>(activeMetric);
+  const dataRef = useRef<FairnessExplainability | null>(data);
+  const scalesRef = useRef<Record<FairnessMetric, MetricScale> | null>(null);
 
-  useEffect(() => { zonesRef.current = zones; }, [zones]);
-
-  const updateChoropleth = useCallback(() => {
-    const m = mapRef.current;
-    if (!m || !readyRef.current || !geoRef.current) return;
-    const src = m.getSource("boroughs") as mapboxgl.GeoJSONSource | undefined;
-    if (!src) return;
-    src.setData(mergeGeoWithZones(geoRef.current, zonesRef.current));
-  }, []);
-
-  /* Fetch GeoJSON once */
   useEffect(() => {
-    fetch(GEOJSON_URL)
-      .then((r) => r.json())
-      .then((data: GeoJSON.FeatureCollection) => {
-        geoRef.current = data;
-        updateChoropleth();
-      })
-      .catch(() => {});
-  }, [updateChoropleth]);
+    activeMetricRef.current = activeMetric;
+  }, [activeMetric]);
 
-  /* Fetch layer data */
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
+
   useEffect(() => {
     let stale = false;
-    api
-      .getFairnessLayer(activeLayer)
-      .then((res) => {
-        if (!stale) {
-          setZones(res.zones || {});
-          setFetchedLayer(activeLayer);
-        }
+    Promise.all([
+      fetch(DATA_URL, { cache: "no-store" }).then((response) => {
+        if (!response.ok) throw new Error("Fairness explainability data missing");
+        return response.json();
+      }),
+      fetch(GEOJSON_URL, { cache: "no-store" }).then((response) => {
+        if (!response.ok) throw new Error("London borough boundary file missing");
+        return response.json() as Promise<GeoJSON.FeatureCollection>;
+      }),
+    ])
+      .then(([json, geo]) => {
+        if (stale) return;
+        setData(normalizeFairnessPayload(json));
+        setGeojson(geo);
       })
-      .catch(() => {
-        if (!stale) { setZones({}); setFetchedLayer(activeLayer); }
+      .catch((cause) => {
+        if (!stale) {
+          setError(cause instanceof Error ? cause.message : "Could not load fairness data.");
+        }
       });
-    return () => { stale = true; };
-  }, [activeLayer]);
+    return () => {
+      stale = true;
+    };
+  }, []);
+
+  const metricScales = useMemo(() => {
+    if (!data) return null;
+    const boroughValues = Object.values(data.boroughs);
+    return {
+      mismatch_hotspots: quantileBreaks(
+        boroughValues.map((borough) => borough.mismatch_hotspots),
+      ),
+      activity_footprint: quantileBreaks(
+        boroughValues.map((borough) => borough.activity_footprint),
+      ),
+      support_coverage: quantileBreaks(
+        boroughValues.map((borough) => borough.support_coverage),
+      ),
+    } satisfies Record<FairnessMetric, MetricScale>;
+  }, [data]);
 
   useEffect(() => {
-    updateChoropleth();
-  }, [zones, updateChoropleth]);
+    scalesRef.current = metricScales;
+  }, [metricScales]);
 
-  /* Initialize map (once, no dependency on data) */
   useEffect(() => {
-    const el = mapContainerRef.current;
-    if (!el || !MAPBOX_TOKEN) return;
-
-    if (mapRef.current) {
-      mapRef.current.remove();
-      mapRef.current = null;
-      readyRef.current = false;
-    }
-
+    if (!MAPBOX_TOKEN || !mapContainerRef.current || mapRef.current) return;
     mapboxgl.accessToken = MAPBOX_TOKEN;
-    const m = new mapboxgl.Map({
-      container: el,
+    const map = new mapboxgl.Map({
+      container: mapContainerRef.current,
       style: "mapbox://styles/mapbox/dark-v11",
       center: CENTER,
-      zoom: 9.3,
-      interactive: true,
+      zoom: 9.15,
       attributionControl: false,
     });
-    mapRef.current = m;
+    mapRef.current = map;
 
-    m.on("load", () => {
-      if (mapRef.current !== m) return;
-      m.resize();
-
-      const initData = geoRef.current
-        ? mergeGeoWithZones(geoRef.current, zonesRef.current)
-        : EMPTY_FC;
-
-      m.addSource("boroughs", { type: "geojson", data: initData });
-
-      m.addLayer({
-        id: "borough-fills",
+    map.on("load", () => {
+      map.addSource("fairness-boroughs", {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+      });
+      map.addLayer({
+        id: "fairness-fills",
         type: "fill",
-        source: "boroughs",
+        source: "fairness-boroughs",
         paint: {
-          "fill-color": ["coalesce", ["get", "fill_color"], "rgba(40,50,90,0.5)"],
-          "fill-opacity": 0.75,
+          "fill-color": ["coalesce", ["get", "fill_color"], "rgba(60,70,90,0.5)"],
+          "fill-opacity": 0.84,
         },
       });
-      m.addLayer({
-        id: "borough-borders",
+      map.addLayer({
+        id: "fairness-borders",
         type: "line",
-        source: "boroughs",
+        source: "fairness-boroughs",
         paint: {
-          "line-color": "rgba(200,200,220,0.25)",
+          "line-color": "rgba(240,240,255,0.26)",
           "line-width": 1,
         },
       });
 
-      const popup = new mapboxgl.Popup({
+      popupRef.current = new mapboxgl.Popup({
         closeButton: false,
         closeOnClick: false,
         className: "fairness-popup",
       });
-      m.on("mousemove", "borough-fills", (e) => {
-        m.getCanvas().style.cursor = "pointer";
-        const props = e.features?.[0]?.properties;
-        if (props) {
-          const drop = (props.drop_ratio * 100).toFixed(0);
-          const night = Number(props.night_value).toFixed(1);
-          const day = Number(props.day_value).toFixed(1);
-          popup
-            .setLngLat(e.lngLat)
-            .setHTML(
-              `<strong>${props.name}</strong><br/>` +
-              `Gap: ${drop}% &middot; Day: ${day} &middot; Night: ${night}`
-            )
-            .addTo(m);
-        }
-      });
-      m.on("mouseleave", "borough-fills", () => {
-        m.getCanvas().style.cursor = "";
-        popup.remove();
+
+      map.on("mousemove", "fairness-fills", (event) => {
+        map.getCanvas().style.cursor = "pointer";
+        const props = event.features?.[0]?.properties;
+        if (!props || !popupRef.current) return;
+
+        const currentMetric = activeMetricRef.current;
+        const currentData = dataRef.current;
+        const label = currentData?.layerMeta[currentMetric].label || "Score";
+        const count = Number(props.count) || 0;
+        const total = Number(props.msoa_count) || 0;
+        const note = total === 1 ? " · single MSOA borough" : "";
+
+        popupRef.current
+          .setLngLat(event.lngLat)
+          .setHTML(
+            `<strong>${props.name}</strong><br/>` +
+            `${props.bucket} London · ${total} MSOAs${note}<br/>` +
+            `${label}: ${Math.round(Number(props.score) * 100)}% (${count}/${total})<br/>` +
+            `Night footprint ${Math.round(Number(props.activity_footprint) * 100)}% · ` +
+            `Support coverage ${Math.round(Number(props.support_coverage) * 100)}%<br/>` +
+            `Mismatch hotspots ${Math.round(Number(props.mismatch_hotspots) * 100)}%<br/>` +
+            `Mean support index ${Number(props.support_index_mean).toFixed(2)} · ` +
+            `Supply change ${Number(props.supply_change_mean).toFixed(2)}`
+          )
+          .addTo(map);
       });
 
-      readyRef.current = true;
+      map.on("mouseleave", "fairness-fills", () => {
+        map.getCanvas().style.cursor = "";
+        popupRef.current?.remove();
+      });
+
+      setReady(true);
     });
 
     return () => {
-      m.remove();
-      if (mapRef.current === m) {
-        mapRef.current = null;
-        readyRef.current = false;
-      }
+      popupRef.current?.remove();
+      popupRef.current = null;
+      map.remove();
+      mapRef.current = null;
+      setReady(false);
     };
-  }, []);
+  }, [data]);
 
-  /* Aggregate MSOA zones → borough-level entries for UI display */
-  const boroughMap: Record<string, { name: string; day: number; night: number; drop: number; count: number }> = {};
-  for (const z of Object.values(zones)) {
-    const borough = extractBorough(z.name);
-    const proper = z.name.replace(/\s+\d{3}$/, "");
-    if (!boroughMap[borough]) {
-      boroughMap[borough] = { name: proper, day: 0, night: 0, drop: 0, count: 0 };
-    }
-    const b = boroughMap[borough];
-    b.day += z.day_value;
-    b.night += z.night_value;
-    b.drop += z.drop_ratio;
-    b.count += 1;
+  useEffect(() => {
+    if (!ready || !mapRef.current || !geojson || !data || !metricScales) return;
+    const source = mapRef.current.getSource("fairness-boroughs") as mapboxgl.GeoJSONSource | undefined;
+    if (!source) return;
+    source.setData(mergeGeoWithMetric(geojson, data.boroughs, activeMetric, metricScales[activeMetric]));
+  }, [activeMetric, data, geojson, metricScales, ready]);
+
+  if (error) {
+    return (
+      <div className="fairness-v2-wrap">
+        <div className="fairness-v2-error">{error}</div>
+      </div>
+    );
   }
-  const aggregatedZones: [string, FairnessZone][] = Object.entries(boroughMap).map(
-    ([key, b]) => [
-      key,
-      {
-        name: b.name,
-        day_value: b.day / b.count,
-        night_value: b.night / b.count,
-        drop_ratio: b.drop / b.count,
-        percentile: 0,
-      },
-    ],
+
+  if (!data || !metricScales) {
+    return (
+      <div className="fairness-v2-wrap">
+        <div className="fairness-v2-loading">Loading fairness explainability...</div>
+      </div>
+    );
+  }
+
+  const metricRows = Object.entries(data.boroughs).sort(
+    (left, right) => right[1][activeMetric] - left[1][activeMetric],
   );
-  const sortedZones = aggregatedZones.sort(
-    ([, a], [, b]) => Math.abs(b.drop_ratio) - Math.abs(a.drop_ratio),
-  );
-  const innerZones = sortedZones.filter(([, z]) => INNER_BOROUGHS.has(z.name));
-  const outerZones = sortedZones.filter(([, z]) => !INNER_BOROUGHS.has(z.name));
+  const activeMeta = data.layerMeta[activeMetric];
+  const activeScale = metricScales[activeMetric];
+  const thresholds = data.thresholds ?? DEFAULT_THRESHOLDS;
+  const thresholdText =
+    activeMetric === "activity_footprint"
+      ? `Threshold: activity_index >= ${thresholds.activity_footprint_min.toFixed(2)}`
+      : activeMetric === "support_coverage"
+        ? `Threshold: support_index >= ${thresholds.support_coverage_min.toFixed(2)}`
+        : `Threshold: activity_index >= ${thresholds.mismatch_activity_min.toFixed(2)} and support_index <= ${thresholds.mismatch_support_max.toFixed(2)}`;
 
   return (
-    <div className="fairness-page-wrap">
-      {/* ── Title ── */}
-      <div className="fairness-hero">
-        <p className="section-label">City-wide Fairness &middot; Mobility Support Inequality</p>
-        <h1 className="fairness-hero-title">
-          Where Does the Day-to-Night Gap{" "}
-          <span style={{ color: "var(--accent-amber)" }}>Widen Most?</span>
+    <div className="fairness-v2-wrap">
+      <section className="fairness-v2-hero">
+        <p className="section-label">Fairness and explainability</p>
+        <h1 className="fairness-v2-title">
+          Where does late-night need stay visible, and where does support fall behind?
         </h1>
-        <p className="fairness-hero-sub">
-          Which areas are more likely to lose high-support public transport
-          experience at night?
+        <p className="fairness-v2-subtitle">
+          The borough map now uses share-based indicators instead of borough-wide means,
+          so outer-London differences do not get flattened by central outliers.
         </p>
-        <p className="fairness-hero-note">
-          This page compares the relative drop from day to night — not absolute
-          night-time values. A large drop means the gap between daytime and
-          night-time experience is wider.
-        </p>
-      </div>
+      </section>
 
-      {/* ── Map section: sidebar + map ── */}
-      <div className="fairness-map-section">
-        <div className="fairness-sidebar">
-          {LAYERS.map((l) => {
-            const isActive = activeLayer === l.id;
-            return (
-              <label
-                key={l.id}
-                className={`fairness-radio-item ${isActive ? "active" : ""}`}
-                style={isActive ? { borderColor: l.accent, color: l.accent } : undefined}
-              >
-                <input
-                  type="radio"
-                  name="fairness-layer"
-                  className="fairness-radio-input"
-                  checked={isActive}
-                  onChange={() => setActiveLayer(l.id)}
-                />
-                <span
-                  className="fairness-radio-dot"
-                  style={{
-                    borderColor: isActive ? l.accent : "var(--text-muted)",
-                    background: isActive ? l.accent : "transparent",
-                  }}
-                />
-                <span className="fairness-radio-label">{l.label}</span>
-              </label>
-            );
-          })}
-        </div>
-
-        <div className="fairness-map-area">
-          {MAPBOX_TOKEN ? (
-            <div ref={mapContainerRef} className="fairness-map-container" />
-          ) : (
-            <div className="fairness-map-placeholder">
-              <p>Map requires NEXT_PUBLIC_MAPBOX_TOKEN</p>
-            </div>
-          )}
-
-          <div className="fairness-legend">
-            <span className="fairness-legend-title">
-              Day-to-Night Gap [0% &rarr; 80%]
-            </span>
-            <div className="fairness-legend-bar" />
-            <div className="fairness-legend-labels">
-              <span>0%</span>
-              <span>20%</span>
-              <span>40%</span>
-              <span>60%</span>
-              <span>80%</span>
-            </div>
+      <section className="fairness-v2-highlights">
+        {data.highlights.map((item) => (
+          <div key={item.title} className="fairness-v2-highlight-card">
+            <div className="fairness-v2-highlight-title">{item.title}</div>
+            <div className="fairness-v2-highlight-value">{item.value}</div>
+            <p className="fairness-v2-highlight-detail">{item.detail}</p>
           </div>
-
-          {loading && (
-            <div className="fairness-map-loading">Loading&hellip;</div>
-          )}
-        </div>
-      </div>
-
-      {/* ── Ethical disclaimer ── */}
-      <p className="fairness-disclaimer">
-        This map does not indicate safety or danger. It highlights where the gap
-        between daytime and night-time public transport support is largest —
-        areas that may benefit most from targeted service investment.
-      </p>
-
-      {/* ── Bottom: Small Multiples ── */}
-      {!loading && sortedZones.length > 0 && (
-        <div className="fairness-sm-row">
-          <SmallMultipleChart
-            title="Small Multiples: Inner vs Outer Support Drop"
-            innerZones={innerZones}
-            outerZones={outerZones}
-            legendLabels={["Inner London", "Peripheral London"]}
-          />
-          <SmallMultipleChart
-            title="Small Multiples: Region-Type Support Drop"
-            innerZones={innerZones}
-            outerZones={outerZones}
-            legendLabels={["Region-type-specific", "Region performance"]}
-          />
-        </div>
-      )}
-
-      {/* ── Inner vs Outer comparison ── */}
-      {!loading && sortedZones.length > 0 && (
-        <div className="fairness-bottom-section">
-          <div className="fairness-comparison">
-            <ZoneGroup title="Inner London" zones={innerZones} />
-            <ZoneGroup title="Outer London" zones={outerZones} />
-          </div>
-
-          <div className="fairness-rank">
-            <h4 className="fairness-rank-title">Day-to-night change by area</h4>
-            <div className="fairness-bars">
-              {sortedZones.slice(0, 15).map(([code, zone]) => {
-                const abs = Math.abs(zone.drop_ratio);
-                const barWidth = Math.min(abs * 100, 100);
-                const dl = dropLabel(zone.drop_ratio);
-                return (
-                  <div key={code} className="fairness-bar-row">
-                    <span className="fairness-bar-name">{zone.name}</span>
-                    <div className="fairness-bar-track">
-                      <div
-                        className="fairness-bar-fill"
-                        style={{ width: `${barWidth}%`, background: dl.color }}
-                      />
-                    </div>
-                    <span className="fairness-bar-value" style={{ color: dl.color }}>
-                      {(zone.drop_ratio * 100).toFixed(0)}%
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ── Zone Group ── */
-
-function ZoneGroup({
-  title,
-  zones,
-}: {
-  title: string;
-  zones: [string, FairnessZone][];
-}) {
-  if (zones.length === 0) return null;
-
-  const avgDay = zones.reduce((s, [, z]) => s + z.day_value, 0) / zones.length;
-  const avgNight = zones.reduce((s, [, z]) => s + z.night_value, 0) / zones.length;
-  const avgDrop = zones.reduce((s, [, z]) => s + z.drop_ratio, 0) / zones.length;
-  const dl = dropLabel(avgDrop);
-
-  return (
-    <div className="fairness-group">
-      <h4 className="fairness-group-title">{title}</h4>
-      <div className="fairness-group-stats">
-        <div className="fairness-group-stat">
-          <span className="fairness-group-val">{avgDay.toFixed(1)}</span>
-          <span className="fairness-group-lbl">Day baseline</span>
-        </div>
-        <span className="fairness-group-arrow">&rarr;</span>
-        <div className="fairness-group-stat">
-          <span className="fairness-group-val">{avgNight.toFixed(1)}</span>
-          <span className="fairness-group-lbl">Night value</span>
-        </div>
-        <div className="fairness-group-stat">
-          <span className="fairness-group-val" style={{ color: dl.color }}>
-            {(avgDrop * 100).toFixed(0)}%
-          </span>
-          <span className="fairness-group-lbl" style={{ color: dl.color }}>
-            {dl.text}
-          </span>
-        </div>
-      </div>
-      <p className="fairness-group-zones">
-        {zones.map(([, z]) => z.name).join(" · ")}
-      </p>
-    </div>
-  );
-}
-
-/* ── Small Multiple Line Chart ── */
-
-function SmallMultipleChart({
-  title,
-  innerZones,
-  outerZones,
-  legendLabels,
-}: {
-  title: string;
-  innerZones: [string, FairnessZone][];
-  outerZones: [string, FairnessZone][];
-  legendLabels: [string, string];
-}) {
-  const W = 360;
-  const H = 180;
-  const PAD = { top: 35, right: 20, bottom: 30, left: 40 };
-
-  const innerPts = innerZones.slice(0, 8).map(([, z], i) => ({
-    x: PAD.left + ((W - PAD.left - PAD.right) * (i + 1)) / 9,
-    y: PAD.top + (1 - Math.abs(z.drop_ratio) / 0.8) * (H - PAD.top - PAD.bottom),
-  }));
-  const outerPts = outerZones.slice(0, 8).map(([, z], i) => ({
-    x: PAD.left + ((W - PAD.left - PAD.right) * (i + 1)) / 9,
-    y: PAD.top + (1 - Math.abs(z.drop_ratio) / 0.8) * (H - PAD.top - PAD.bottom),
-  }));
-
-  const makePath = (pts: { x: number; y: number }[]) =>
-    pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
-
-  const yTicks = [0, 20, 40, 60, 80];
-
-  return (
-    <div className="fairness-sm-card">
-      <div className="fairness-sm-header">
-        <h4 className="fairness-sm-title">{title}</h4>
-        <div className="fairness-sm-legend">
-          <span className="fairness-sm-dot" style={{ background: "#d4946a" }} />
-          <span>{legendLabels[0]}</span>
-          <span className="fairness-sm-dot" style={{ background: "#c9a96e" }} />
-          <span>{legendLabels[1]}</span>
-        </div>
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="fairness-sm-svg">
-        {yTicks.map((v) => {
-          const y = PAD.top + (1 - v / 80) * (H - PAD.top - PAD.bottom);
-          return (
-            <g key={v}>
-              <line x1={PAD.left} y1={y} x2={W - PAD.right} y2={y} stroke="rgba(200,200,220,0.1)" />
-              <text x={PAD.left - 6} y={y + 3} textAnchor="end" fill="#6b7194" fontSize="9">
-                {v}
-              </text>
-            </g>
-          );
-        })}
-        <text x={PAD.left + 30} y={H - 8} fill="#6b7194" fontSize="9" textAnchor="middle">Inner</text>
-        <text x={W / 2} y={H - 8} fill="#6b7194" fontSize="9" textAnchor="middle">Area</text>
-        <text x={W - PAD.right - 30} y={H - 8} fill="#6b7194" fontSize="9" textAnchor="middle">Outer</text>
-        <text x={12} y={H / 2} fill="#6b7194" fontSize="9" textAnchor="middle" transform={`rotate(-90,12,${H / 2})`}>
-          Support Drop
-        </text>
-        {innerPts.length > 1 && (
-          <path d={makePath(innerPts)} fill="none" stroke="#d4946a" strokeWidth="2" opacity="0.85" />
-        )}
-        {outerPts.length > 1 && (
-          <path d={makePath(outerPts)} fill="none" stroke="#c9a96e" strokeWidth="2" opacity="0.85" />
-        )}
-        {innerPts.map((p, i) => (
-          <circle key={`i${i}`} cx={p.x} cy={p.y} r="3" fill="#d4946a" />
         ))}
-        {outerPts.map((p, i) => (
-          <circle key={`o${i}`} cx={p.x} cy={p.y} r="3" fill="#c9a96e" />
-        ))}
-      </svg>
+      </section>
+
+      <section className="fairness-v2-map-shell">
+        <div className="fairness-v2-sidebar">
+          <h2 className="fairness-v2-panel-title">Borough map</h2>
+          <p className="fairness-v2-panel-copy">
+            Each layer measures the share of MSOAs inside a borough that meet a specific
+            after-dark condition. This surfaces internal borough structure instead of
+            compressing everything into one average.
+          </p>
+          <div className="fairness-v2-toggle-group">
+            {METRIC_ORDER.map((metric) => {
+              const meta = data.layerMeta[metric];
+              const active = metric === activeMetric;
+              return (
+                <button
+                  key={metric}
+                  type="button"
+                  className={`fairness-v2-toggle ${active ? "active" : ""}`}
+                  onClick={() => setActiveMetric(metric)}
+                  style={active ? { borderColor: meta.accent, color: meta.accent } : undefined}
+                >
+                  {meta.label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="fairness-v2-layer-copy">
+            <div className="fairness-v2-layer-heading">{activeMeta.label}</div>
+            <p>{activeMeta.description}</p>
+            <p>{thresholdText}</p>
+          </div>
+          <div className="fairness-v2-method-list">
+            {data.method.map((item) => (
+              <p key={item}>{item}</p>
+            ))}
+          </div>
+        </div>
+
+        <div className="fairness-v2-map-stage">
+          <div ref={mapContainerRef} className="fairness-map-container" />
+          <div className="fairness-v2-legend">
+            <div className="fairness-v2-legend-title">{activeMeta.label}</div>
+            <div className="fairness-v2-legend-bar">
+              {METRIC_PALETTES[activeMetric].map((color) => (
+                <span key={color} style={{ background: color }} />
+              ))}
+            </div>
+            <div className="fairness-v2-legend-labels">
+              <span>{formatPct(clamp(activeScale.min))}</span>
+              <span>{formatPct(clamp((activeScale.min + activeScale.max) / 2))}</span>
+              <span>{formatPct(clamp(activeScale.max))}</span>
+            </div>
+            <p className="fairness-v2-note">
+              Quantile-scaled colors keep non-central borough differences legible.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="fairness-v2-grid">
+        <article className="fairness-v2-card">
+          <div className="fairness-v2-card-header">
+            <h3>Who relies more on the night network?</h3>
+            <p>Night bus use shifts most for these groups when compared with daytime composition.</p>
+          </div>
+          <AudienceShiftChart items={data.audienceShift} />
+        </article>
+
+        <article className="fairness-v2-card">
+          <div className="fairness-v2-card-header">
+            <h3>Inner and outer boroughs diverge differently</h3>
+            <p>Inner London keeps a stronger night footprint, while outer London carries more mismatch hotspots.</p>
+          </div>
+          <InnerOuterSlopeChart items={data.innerOuter} />
+          <p className="fairness-v2-note">{data.commuteSnapshot.narrative}</p>
+        </article>
+      </section>
+
+      <section className="fairness-v2-grid fairness-v2-grid-single">
+        <article className="fairness-v2-card">
+          <div className="fairness-v2-card-header">
+            <h3>Which boroughs score highest on {activeMeta.label.toLowerCase()}?</h3>
+            <p>Ranking uses the same borough-share metric as the map, so the top list and the choropleth tell the same story.</p>
+          </div>
+          <BoroughRankingChart rows={metricRows} metric={activeMetric} />
+        </article>
+      </section>
+
+      <p className="fairness-v2-disclaimer">
+        These layers are explanatory spatial proxies built from processed MSOA support and activity data, plus borough-level supply change context.
+        They help compare where late-night conditions thin out unevenly, but they are not measures of personal safety or lived experience on their own.
+      </p>
     </div>
   );
 }

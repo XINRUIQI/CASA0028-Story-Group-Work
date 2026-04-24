@@ -16,13 +16,17 @@ function staticKey(path: string, params?: Record<string, string>): string | null
   return `${dir}/${vals}.json`;
 }
 
-async function fetchJSON<T>(path: string, params?: Record<string, string>): Promise<T> {
+async function fetchJSON<T>(
+  path: string,
+  params?: Record<string, string>,
+  timeoutMs = 10_000,
+): Promise<T> {
   const url = new URL(path, API_BASE);
   if (params) {
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   }
   try {
-    const res = await fetch(url.toString(), { signal: AbortSignal.timeout(10_000) });
+    const res = await fetch(url.toString(), { signal: AbortSignal.timeout(timeoutMs) });
     if (!res.ok) throw new Error(`API error ${res.status}: ${res.statusText}`);
     return res.json();
   } catch (liveErr) {
@@ -148,6 +152,23 @@ export interface CompareCardsResult {
   note: string;
 }
 
+export interface CompareHourlyResult {
+  origin: string;
+  destination: string;
+  curves: Record<string, {
+    duration_min: number;
+    waiting_burden: number;
+    wait_share: number;
+    support_open: number;
+    support_ratio: number | null;
+    uncertainty_score_pct: number | null;
+    mean_headway_gap_ratio: number | null;
+    safety_score_pct: number | null;
+    safety_exposure_pct: number | null;
+    max_recovery_penalty_min: number;
+  } | null>;
+}
+
 export interface MissedConnectionResult {
   naptan_id: string;
   line_id: string;
@@ -228,7 +249,15 @@ export const api = {
       origin,
       destination,
       times: times.join(","),
-    });
+    }, 40_000);
+  },
+
+  compareHourly(origin: string, destination: string, times: string[]) {
+    return fetchJSON<CompareHourlyResult>("/compare/hourly", {
+      origin,
+      destination,
+      times: times.join(","),
+    }, 60_000);
   },
 
   getRouteSupport(legs: Leg[], time?: string) {

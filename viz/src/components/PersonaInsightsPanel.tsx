@@ -1,30 +1,67 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import {
-  PERSONA_DEFS,
-  PERSONA_ROUTES,
-  type PersonaId,
-} from "@/components/PersonaSwitch";
+  Bus,
+  Clock3,
+  CircleHelp,
+  Users,
+  Activity,
+  Lightbulb,
+  Star,
+} from "lucide-react";
+import { PERSONA_DEFS, type PersonaId } from "@/components/PersonaSwitch";
 import { api } from "@/lib/api";
+import {
+  COMPARE_TIMES,
+  DISPLAY_TIME_LABELS,
+  FIXED_ROUTE_PRESETS,
+  encodeCompareTimes,
+} from "@/lib/journeyPresets";
+import { normalizeServiceUncertainty } from "@/lib/serviceUncertainty";
+
+const PRESET_ROUTES: Record<
+  PersonaId,
+  { origin: string; dest: string; oName: string; dName: string }
+> = {
+  student: {
+    origin: FIXED_ROUTE_PRESETS.student.origin,
+    dest: FIXED_ROUTE_PRESETS.student.destination,
+    oName: FIXED_ROUTE_PRESETS.student.originName,
+    dName: FIXED_ROUTE_PRESETS.student.destinationName,
+  },
+  budget: {
+    origin: FIXED_ROUTE_PRESETS.budget.origin,
+    dest: FIXED_ROUTE_PRESETS.budget.destination,
+    oName: FIXED_ROUTE_PRESETS.budget.originName,
+    dName: FIXED_ROUTE_PRESETS.budget.destinationName,
+  },
+  nightworker: {
+    origin: FIXED_ROUTE_PRESETS.nightworker.origin,
+    dest: FIXED_ROUTE_PRESETS.nightworker.destination,
+    oName: FIXED_ROUTE_PRESETS.nightworker.originName,
+    dName: FIXED_ROUTE_PRESETS.nightworker.destinationName,
+  },
+  unfamiliar: {
+    origin: FIXED_ROUTE_PRESETS.unfamiliar.origin,
+    dest: FIXED_ROUTE_PRESETS.unfamiliar.destination,
+    oName: FIXED_ROUTE_PRESETS.unfamiliar.originName,
+    dName: FIXED_ROUTE_PRESETS.unfamiliar.destinationName,
+  },
+};
 
 const HOURS = [
-  "18:00",
+  "14:00",
   "19:00",
-  "20:00",
-  "21:00",
-  "22:00",
-  "23:00",
   "00:00",
-  "01:00",
-  "02:00",
 ];
 
 interface HourlyPoint {
   duration_min: number;
   waiting_burden: number;
   support_open: number;
-  recovery_penalty: number;
+  service_uncertainty: number;
 }
 
 /* ── Portrait SVGs ── */
@@ -213,8 +250,8 @@ const CHART_LINES = [
     color: "var(--accent-emerald)",
   },
   {
-    key: "recovery_penalty" as const,
-    label: "Recovery penalty",
+    key: "service_uncertainty" as const,
+    label: "Uncertainty index",
     color: "var(--accent-amber)",
   },
   {
@@ -253,6 +290,7 @@ function HourlyLineChart({
   curves: Record<string, HourlyPoint | null>;
 }) {
   const hours = HOURS.filter((h) => curves[h] !== undefined);
+  const denominator = Math.max(hours.length - 1, 1);
 
   const normed = useMemo(() => {
     if (hours.length === 0) return {};
@@ -265,7 +303,7 @@ function HourlyLineChart({
       const range = max - min || 1;
       result[line.key] = hours.map((h, i) => {
         const v = curves[h]?.[line.key] ?? null;
-        const x = CHART_PAD.left + (i / (hours.length - 1)) * CHART_CW;
+        const x = CHART_PAD.left + (i / denominator) * CHART_CW;
         const y =
           v !== null
             ? CHART_PAD.top + (1 - (v - min) / range) * CHART_CH
@@ -274,35 +312,36 @@ function HourlyLineChart({
       });
     }
     return result;
-  }, [curves, hours]);
+  }, [curves, denominator, hours]);
 
   if (hours.length === 0) return null;
 
   const annotations = [
     {
-      x: CHART_PAD.left + (1 / (hours.length - 1)) * CHART_CW,
+      x: CHART_PAD.left + (1 / denominator) * CHART_CW,
       y: CHART_PAD.top + 6,
-      text: "Waiting burden increases (High!)",
+      text: "Afternoon baseline",
       anchor: "start" as const,
     },
     {
-      x: CHART_PAD.left + (4 / (hours.length - 1)) * CHART_CW,
+      x: CHART_PAD.left + (1 / denominator) * CHART_CW,
       y: CHART_PAD.top + CHART_CH * 0.38,
-      text: "Nearby Support Drops (Mid)",
+      text: "Evening transition",
       anchor: "middle" as const,
     },
     {
-      x: CHART_PAD.left + (7 / (hours.length - 1)) * CHART_CW,
+      x: CHART_PAD.left + (2 / denominator) * CHART_CW,
       y: CHART_PAD.top + 14,
-      text: "Recovery Penalty Increases",
+      text: "Late-night conditions",
       anchor: "end" as const,
     },
   ];
 
   return (
     <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="choose-line-svg">
+      {/* grid lines */}
       {hours.map((_, i) => {
-        const x = CHART_PAD.left + (i / (hours.length - 1)) * CHART_CW;
+        const x = CHART_PAD.left + (i / denominator) * CHART_CW;
         return (
           <line
             key={i}
@@ -316,6 +355,7 @@ function HourlyLineChart({
         );
       })}
 
+      {/* lines */}
       {CHART_LINES.map((line) => (
         <g key={line.key}>
           <path
@@ -340,6 +380,7 @@ function HourlyLineChart({
         </g>
       ))}
 
+      {/* annotations */}
       {annotations.map((a, i) => (
         <text
           key={i}
@@ -355,8 +396,9 @@ function HourlyLineChart({
         </text>
       ))}
 
+      {/* x-axis labels */}
       {hours.map((h, i) => {
-        const x = CHART_PAD.left + (i / (hours.length - 1)) * CHART_CW;
+        const x = CHART_PAD.left + (i / denominator) * CHART_CW;
         return (
           <text
             key={h}
@@ -366,7 +408,7 @@ function HourlyLineChart({
             fill="var(--text-muted)"
             fontSize="11"
           >
-            {h}
+            {DISPLAY_TIME_LABELS[h] ?? h}
           </text>
         );
       })}
@@ -374,39 +416,108 @@ function HourlyLineChart({
   );
 }
 
-/* ── Main component ── */
+/* ── Metric card ── */
 
-interface Props {
-  persona?: PersonaId | null;
-  onPersonaChange?: (p: PersonaId | null) => void;
+function MetricCard({
+  label,
+  value,
+  icon,
+}: {
+  label: string;
+  value: string;
+  icon: React.ReactNode;
+}) {
+  return (
+    <div className="choose-metric-card">
+      <div className="choose-metric-label">{label}</div>
+      <div className="choose-metric-value">{value}</div>
+      <div className="choose-metric-icon">{icon}</div>
+    </div>
+  );
 }
 
-export default function PersonaInsightsPanel({
-  persona: personaProp,
-  onPersonaChange,
-}: Props = {}) {
-  const [personaState, setPersonaState] = useState<PersonaId | null>(null);
-  const persona = personaProp !== undefined ? personaProp : personaState;
-  const setPersona = (p: PersonaId | null) => {
-    if (onPersonaChange) onPersonaChange(p);
-    if (personaProp === undefined) setPersonaState(p);
-  };
+/* ── Helpers ── */
 
+function fmtBurden(cards: Record<string, unknown> | null | undefined): string {
+  if (!cards) return "—";
+  const v = Number(cards.total_expected_wait_min ?? 0);
+  if (v > 8) return "(High!)";
+  if (v > 3) return "(Mid)";
+  return "(Low)";
+}
+
+function fmtUncertainty(
+  cards: Record<string, unknown> | null | undefined,
+): string {
+  const uncertainty = normalizeServiceUncertainty(cards);
+  if (uncertainty.scorePct == null) return "—";
+  return `${Math.round(uncertainty.scorePct)}%`;
+}
+
+function fmtSupport(
+  cards: Record<string, unknown> | null | undefined,
+): string {
+  if (!cards) return "—";
+  const v = Number(cards.total_support_open ?? 0);
+  return v === 0 ? "(None)" : String(v);
+}
+
+function fmtDuration(
+  cards: Record<string, unknown> | null | undefined,
+): string {
+  if (!cards) return "—";
+  const v = Number(cards.total_duration_min ?? 0);
+  return v > 0 ? v.toFixed(2) : "—";
+}
+
+function fmtActivity(
+  cards: Record<string, unknown> | null | undefined,
+): string {
+  if (!cards) return "—";
+  const open = cards.open_count ?? cards.nearby_activity_open ?? null;
+  const total = cards.total_count ?? cards.nearby_activity_total ?? null;
+  if (open !== null && total !== null) return `${open}/${total}`;
+  return "—";
+}
+
+function fmtLighting(
+  cards: Record<string, unknown> | null | undefined,
+): string {
+  if (!cards) return "—";
+  const v = cards.lamp_count ?? cards.lamp_density ?? null;
+  if (v !== null) return String(Math.round(Number(v)));
+  return "—";
+}
+
+/* ── Page ── */
+
+export default function ChoosePage() {
+  const [persona, setPersona] = useState<PersonaId>("student");
   const [curves, setCurves] = useState<Record<string, HourlyPoint | null>>({});
+  const [rawCards, setRawCards] = useState<
+    Record<string, Record<string, Record<string, unknown>> | null>
+  >({});
+  const [fetchedKey, setFetchedKey] = useState("");
 
-  const preset = persona ? PERSONA_ROUTES[persona] : null;
+  const preset = PRESET_ROUTES[persona];
+  const routeKey = `${preset.origin}|${preset.dest}`;
+  const loading = routeKey !== fetchedKey;
 
   useEffect(() => {
-    if (!preset) return;
     let stale = false;
     api
       .compareCards(preset.origin, preset.dest, HOURS)
       .then((res) => {
         if (stale) return;
         const pts: Record<string, HourlyPoint | null> = {};
+        const cards: Record<
+          string,
+          Record<string, Record<string, unknown>> | null
+        > = {};
         for (const [t, opt] of Object.entries(res.options)) {
           if (!opt) {
             pts[t] = null;
+            cards[t] = null;
             continue;
           }
           const c = opt.cards as Record<string, Record<string, unknown>>;
@@ -416,64 +527,121 @@ export default function PersonaInsightsPanel({
               c.waiting_burden?.total_expected_wait_min ?? 0,
             ),
             support_open: Number(c.support_access?.total_support_open ?? 0),
-            recovery_penalty:
-              Number(c.service_uncertainty?.mean_headway_gap_ratio ?? 0) * 5,
+            service_uncertainty: Number(
+              c.service_uncertainty?.uncertainty_score_pct ?? 0,
+            ),
           };
+          cards[t] = c;
         }
         setCurves(pts);
+        setRawCards(cards);
+        setFetchedKey(`${preset.origin}|${preset.dest}`);
+      })
+      .catch(() => {
+        if (!stale) {
+          setCurves({});
+          setRawCards({});
+          setFetchedKey(`${preset.origin}|${preset.dest}`);
+        }
       });
     return () => {
       stale = true;
     };
-  }, [preset?.origin, preset?.dest]);
+  }, [preset.origin, preset.dest]);
+
+  const refCards = rawCards[COMPARE_TIMES[1]] ?? rawCards[COMPARE_TIMES[0]] ?? null;
 
   return (
-    <div className="persona-insights-panel">
-      <div className="choose-persona-row">
-        {PERSONA_DEFS.map((p) => {
-          const Portrait = PORTRAITS[p.id];
-          const isActive = persona === p.id;
-          return (
-            <div key={p.id} className="choose-persona-wrap">
-              <div
-                className={`choose-persona-bubble ${isActive ? "visible" : ""}`}
-                style={{ borderColor: p.accent, color: p.accent }}
-                role="status"
-                aria-hidden={!isActive}
-              >
-                {p.need}
-              </div>
+    <div className="choose-page">
+      <div className="choose-map-bg" />
+
+      <div className="choose-content">
+        {/* ── Persona portrait cards ── */}
+        <div className="choose-persona-row">
+          {PERSONA_DEFS.map((p) => {
+            const Portrait = PORTRAITS[p.id];
+            return (
               <button
-                className={`choose-persona-card ${isActive ? "active" : ""}`}
-                onClick={() => setPersona(isActive ? null : p.id)}
-                type="button"
-                aria-pressed={isActive}
+                key={p.id}
+                className={`choose-persona-card ${persona === p.id ? "active" : ""}`}
+                onClick={() => setPersona(p.id)}
               >
                 <div className="choose-persona-portrait">
                   <Portrait />
                 </div>
                 <span className="choose-persona-name">[{p.label}]</span>
               </button>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
+
+        {/* ── Line chart ── */}
+        <div className="choose-chart-section">
+          <h3 className="choose-chart-title">
+            How this route shifts across daytime, evening, and late night
+          </h3>
+          {loading ? (
+            <p className="choose-chart-loading">Loading hourly data…</p>
+          ) : Object.keys(curves).length === 0 ? (
+            <p className="choose-chart-loading">
+              Start the backend to enable live queries.
+            </p>
+          ) : (
+            <HourlyLineChart curves={curves} />
+          )}
+        </div>
+
+        {/* ── Bottom metric cards ── */}
+        <div className="choose-metrics-row">
+          <MetricCard
+            label="Functional Cost"
+            value={fmtDuration(refCards?.functional_cost)}
+            icon={<Bus size={18} />}
+          />
+          <MetricCard
+            label="Waiting Burden"
+            value={fmtBurden(refCards?.waiting_burden)}
+            icon={<Clock3 size={18} />}
+          />
+          <MetricCard
+            label="Service Uncertain"
+            value={fmtUncertainty(refCards?.service_uncertainty)}
+            icon={<CircleHelp size={18} />}
+          />
+          <MetricCard
+            label="Support Access"
+            value={fmtSupport(refCards?.support_access)}
+            icon={<Users size={18} />}
+          />
+          <MetricCard
+            label="Activity Context"
+            value={fmtActivity(refCards?.activity_context)}
+            icon={<Activity size={18} />}
+          />
+          <MetricCard
+            label="Lighting Proxy"
+            value={fmtLighting(refCards?.lighting_proxy)}
+            icon={<Lightbulb size={18} />}
+          />
+        </div>
+
+        {/* ── Navigation ── */}
+        <div className="choose-nav">
+          <Link
+            href={`/compare?origin=${preset.origin}&originName=${encodeURIComponent(preset.oName)}&destination=${preset.dest}&destinationName=${encodeURIComponent(preset.dName)}&times=${encodeURIComponent(encodeCompareTimes(COMPARE_TIMES))}`}
+            className="choose-nav-btn"
+          >
+            Compare this journey →
+          </Link>
+          <Link href="/reflection" className="choose-nav-btn choose-nav-secondary">
+            Reflection & limits
+          </Link>
+        </div>
       </div>
 
-      <div className="choose-chart-section">
-        <h3 className="choose-chart-title">
-          Hourly Curves of extra journey burdens (18:00 - 02:00)
-        </h3>
-        {!persona ? (
-          <p className="choose-chart-loading">
-            Pick a traveller above to see their hourly burden curves.
-          </p>
-        ) : Object.keys(curves).length === 0 ? (
-          <p className="choose-chart-loading">Loading hourly data…</p>
-        ) : (
-          <HourlyLineChart curves={curves} />
-        )}
+      <div className="choose-sparkle">
+        <Star size={18} />
       </div>
-
     </div>
   );
 }

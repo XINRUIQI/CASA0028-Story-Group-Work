@@ -2,6 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { GraduationCap, Coins, Briefcase, MapPinOff } from "lucide-react";
+import {
+  COMPARE_TIMES,
+  FIXED_ROUTE_PRESETS,
+  encodeCompareTimes,
+} from "@/lib/journeyPresets";
 
 interface PresetRoute {
   id: string;
@@ -22,11 +27,11 @@ const PRESETS: PresetRoute[] = [
     icon: <GraduationCap size={18} />,
     label: "Late-night student",
     description: "UCL to Seven Sisters — returning from the library",
-    originName: "Euston Square",
-    originId: "940GZZLUESQ",
-    destName: "Seven Sisters",
-    destId: "HUBSVS",
-    times: "18:00,21:00,23:30",
+    originName: FIXED_ROUTE_PRESETS.student.originName,
+    originId: FIXED_ROUTE_PRESETS.student.origin,
+    destName: FIXED_ROUTE_PRESETS.student.destinationName,
+    destId: FIXED_ROUTE_PRESETS.student.destination,
+    times: encodeCompareTimes(COMPARE_TIMES),
     accentColor: "var(--champagne-gold)",
   },
   {
@@ -34,11 +39,11 @@ const PRESETS: PresetRoute[] = [
     icon: <Coins size={18} />,
     label: "Budget traveller",
     description: "Stratford to Brixton — cheapest late options",
-    originName: "Stratford",
-    originId: "940GZZLUSTD",
-    destName: "Brixton",
-    destId: "940GZZLUBXN",
-    times: "18:00,21:00,23:30",
+    originName: FIXED_ROUTE_PRESETS.budget.originName,
+    originId: FIXED_ROUTE_PRESETS.budget.origin,
+    destName: FIXED_ROUTE_PRESETS.budget.destinationName,
+    destId: FIXED_ROUTE_PRESETS.budget.destination,
+    times: encodeCompareTimes(COMPARE_TIMES),
     accentColor: "var(--accent-amber)",
   },
   {
@@ -46,11 +51,11 @@ const PRESETS: PresetRoute[] = [
     icon: <Briefcase size={18} />,
     label: "Night-shift worker",
     description: "King's Cross to Barking — finishing late",
-    originName: "King's Cross",
-    originId: "940GZZLUKSX",
-    destName: "Barking",
-    destId: "940GZZLUBKG",
-    times: "22:00,23:30,01:00",
+    originName: FIXED_ROUTE_PRESETS.nightworker.originName,
+    originId: FIXED_ROUTE_PRESETS.nightworker.origin,
+    destName: FIXED_ROUTE_PRESETS.nightworker.destinationName,
+    destId: FIXED_ROUTE_PRESETS.nightworker.destination,
+    times: encodeCompareTimes(COMPARE_TIMES),
     accentColor: "var(--accent-emerald)",
   },
   {
@@ -58,11 +63,11 @@ const PRESETS: PresetRoute[] = [
     icon: <MapPinOff size={18} />,
     label: "Unfamiliar traveller",
     description: "Liverpool Street to Greenwich — first time in London",
-    originName: "Liverpool Street",
-    originId: "940GZZLULVT",
-    destName: "Greenwich",
-    destId: "940GZZDLGRE",
-    times: "18:00,21:00,23:30",
+    originName: FIXED_ROUTE_PRESETS.unfamiliar.originName,
+    originId: FIXED_ROUTE_PRESETS.unfamiliar.origin,
+    destName: FIXED_ROUTE_PRESETS.unfamiliar.destinationName,
+    destId: FIXED_ROUTE_PRESETS.unfamiliar.destination,
+    times: encodeCompareTimes(COMPARE_TIMES),
     accentColor: "var(--accent-rose)",
   },
 ];

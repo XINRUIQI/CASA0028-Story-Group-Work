@@ -30,7 +30,7 @@ const OFFLINE_STOPS: StopPointMatch[] = [
   { name: "Angel", naptan_id: "940GZZLUAGL", lat: 51.5322, lon: -0.1058, modes: ["tube"] },
   { name: "Seven Sisters", naptan_id: "HUBSVS", lat: 51.5822, lon: -0.0749, modes: ["tube", "rail"] },
   { name: "Barking", naptan_id: "940GZZLUBKG", lat: 51.5396, lon: 0.0809, modes: ["tube", "rail"] },
-  { name: "Greenwich", naptan_id: "HUBGNW", lat: 51.4781, lon: -0.0149, modes: ["rail"] },
+  { name: "Greenwich", naptan_id: "940GZZDLGRE", lat: 51.4781, lon: -0.0149, modes: ["dlr", "rail"] },
   { name: "Finsbury Park", naptan_id: "940GZZLUFPK", lat: 51.5642, lon: -0.1065, modes: ["tube", "rail"] },
   { name: "Bethnal Green", naptan_id: "940GZZLUBLG", lat: 51.5270, lon: -0.0549, modes: ["tube"] },
   { name: "Mile End", naptan_id: "940GZZLUMED", lat: 51.5249, lon: -0.0332, modes: ["tube"] },

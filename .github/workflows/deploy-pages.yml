@@ -1,21 +1,10 @@
-# CI + Deploy
-# Runs lint & data API checks on every push / PR to main or QXR.
-# On push (not PR), also builds and deploys static viz to GitHub Pages.
-#
-# Setup (one-time):
-#   Repo → Settings → Pages → Build and deployment → Source: "GitHub Actions"
-#
-# Optional:
-#   Repo → Settings → Secrets and variables → Actions → Variables
-#   Add NEXT_PUBLIC_API_BASE = your deployed API URL (e.g. https://your-api.fly.dev)
-
 name: CI / Deploy
 
 on:
   push:
-    branches: [main, QXR, lhx]
+    branches: [test2]
   pull_request:
-    branches: [main, QXR, lhx]
+    branches: [test2]
   workflow_dispatch:
 
 permissions:
@@ -28,7 +17,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ── CI checks ──────────────────────────────────────────
   lint:
     name: Frontend Lint
     runs-on: ubuntu-latest
@@ -77,11 +65,10 @@ jobs:
       - name: Compile backend package
         run: python -m compileall -q data
 
-  # ── Build & Deploy (only on push / manual, after CI passes) ──
   build:
     name: Build static site
     needs: [lint, backend]
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -121,6 +108,7 @@ jobs:
   deploy:
     name: Deploy to Pages
     needs: build
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

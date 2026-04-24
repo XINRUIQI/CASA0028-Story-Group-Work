@@ -5,7 +5,78 @@ import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import type { Leg } from "@/lib/api";
 
-const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
+const MAPBOX_TOKEN =
+  process.env.NEXT_PUBLIC_MAPBOX_TOKEN ||
+  "pk.eyJ1IjoibGV2aW5lbGl1IiwiYSI6ImNta21vc3doOTBleGYza3IycDNsOXRidXQifQ.SdtOnvfZEml6QGLmnnduDQ";
+
+type RouteMapTheme = "day" | "evening" | "night";
+
+const MAP_STYLES: Record<RouteMapTheme, string> = {
+  day: "mapbox://styles/mapbox/streets-v12",
+  evening: "mapbox://styles/mapbox/navigation-day-v1",
+  night: "mapbox://styles/mapbox/navigation-night-v1",
+};
+
+const SIMPLE_BASEMAP_HIDDEN_LAYERS = [
+  /road/i,
+  /bridge/i,
+  /tunnel/i,
+  /street/i,
+  /traffic/i,
+  /poi/i,
+  /transit/i,
+  /building/i,
+  /park/i,
+  /landuse/i,
+  /landcover/i,
+  /hillshade/i,
+  /contour/i,
+  /path/i,
+  /pedestrian/i,
+  /rail/i,
+  /airport/i,
+];
+
+const SIMPLE_BASEMAP_KEEP_LAYERS = [
+  /background/i,
+  /water/i,
+  /place-label/i,
+  /settlement/i,
+  /country-label/i,
+  /state-label/i,
+  /admin/i,
+];
+
+function simplifyBasemap(map: mapboxgl.Map) {
+  const style = map.getStyle();
+  const layers = style.layers || [];
+
+  layers.forEach((layer) => {
+    const layerId = layer.id;
+    if (SIMPLE_BASEMAP_KEEP_LAYERS.some((pattern) => pattern.test(layerId))) {
+      return;
+    }
+    if (SIMPLE_BASEMAP_HIDDEN_LAYERS.some((pattern) => pattern.test(layerId))) {
+      map.setLayoutProperty(layerId, "visibility", "none");
+    }
+  });
+}
+
+function parseLineStringPath(path: string): [number, number][] | null {
+  if (!path.trim().startsWith("[[")) return null;
+
+  try {
+    const parsed = JSON.parse(path) as [number, number][];
+    if (!Array.isArray(parsed)) return null;
+    const coords = parsed
+      .filter((pair) => Array.isArray(pair) && pair.length >= 2)
+      .map(([lat, lon]) => [Number(lon), Number(lat)] as [number, number])
+      .filter(([lon, lat]) => Number.isFinite(lon) && Number.isFinite(lat));
+    return coords.length >= 2 ? coords : null;
+  } catch {
+    return null;
+  }
+}
 
 function decodePolyline(encoded: string): [number, number][] {
   const coords: [number, number][] = [];
@@ -48,6 +119,8 @@ interface RouteMapProps {
   label: string;
   accent?: string;
   supportCount?: number;
+  supportSummary?: string;
+  theme?: RouteMapTheme;
 }
 
 export default function RouteMap({
@@ -55,6 +128,8 @@ export default function RouteMap({
   label,
   accent = "var(--champagne-gold)",
   supportCount,
+  supportSummary,
+  theme = "evening",
 }: RouteMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -65,7 +140,7 @@ export default function RouteMap({
     mapboxgl.accessToken = MAPBOX_TOKEN;
     const map = new mapboxgl.Map({
       container: containerRef.current,
-      style: "mapbox://styles/mapbox/dark-v11",
+      style: MAP_STYLES[theme],
       center: [-0.118, 51.509],
       zoom: 11,
       interactive: false,
@@ -74,12 +149,14 @@ export default function RouteMap({
     mapRef.current = map;
 
     map.on("load", () => {
+      simplifyBasemap(map);
+
       const allCoords: [number, number][] = [];
 
       legs.forEach((leg, i) => {
         let coords: [number, number][] = [];
         if (leg.path) {
-          coords = decodePolyline(leg.path);
+          coords = parseLineStringPath(leg.path) || decodePolyline(leg.path);
         } else {
           const depLat = leg.departure_point.lat;
           const depLon = leg.departure_point.lon;
@@ -150,7 +227,7 @@ export default function RouteMap({
     });
 
     return () => { map.remove(); };
-  }, [legs]);
+  }, [legs, theme]);
 
   if (!MAPBOX_TOKEN) {
     return (
@@ -165,9 +242,9 @@ export default function RouteMap({
             </p>
           )}
         </div>
-        {supportCount != null && (
+        {(supportSummary || supportCount != null) && (
           <div className="route-map-support">
-            {supportCount} support points nearby
+            {supportSummary || `${supportCount} support points nearby`}
           </div>
         )}
       </div>
@@ -178,9 +255,9 @@ export default function RouteMap({
     <div className="route-map-card">
       <div className="route-map-label" style={{ color: accent }}>{label}</div>
       <div ref={containerRef} className="route-map-container" />
-      {supportCount != null && (
+      {(supportSummary || supportCount != null) && (
         <div className="route-map-support">
-          {supportCount} support points nearby
+          {supportSummary || `${supportCount} support points nearby`}
         </div>
       )}
     </div>
