@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { Clock, ShieldCheck, Activity, HelpCircle, X } from "lucide-react";
 
 const STAR_COUNT = 90;
 
@@ -33,8 +34,36 @@ function generateStars(): Star[] {
 
 const STATIC_STARS = generateStars();
 
+const INTRO_DIMENSIONS = [
+  {
+    icon: Clock,
+    title: "Waiting",
+    description:
+      "How long you may wait, and what happens if you miss a connection.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Support nearby",
+    description:
+      "Shelters, open shops, pharmacies, and other facilities along the route.",
+  },
+  {
+    icon: Activity,
+    title: "Activity around stops",
+    description:
+      "Whether the surroundings are busy or quiet at different times.",
+  },
+  {
+    icon: HelpCircle,
+    title: "Service uncertainty",
+    description:
+      "How predictable the service is, and whether disruptions are reported.",
+  },
+];
+
 export default function HeroCover() {
   const [visible, setVisible] = useState(false);
+  const [showIntro, setShowIntro] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -42,10 +71,36 @@ export default function HeroCover() {
     return () => clearTimeout(t);
   }, []);
 
-  const scrollToContent = () => {
-    sectionRef.current?.nextElementSibling?.scrollIntoView({
-      behavior: "smooth",
-    });
+  // Lock background scroll while modal is open
+  useEffect(() => {
+    if (!showIntro) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [showIntro]);
+
+  // Close on Escape
+  useEffect(() => {
+    if (!showIntro) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowIntro(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showIntro]);
+
+  const openIntro = () => setShowIntro(true);
+
+  const continueToNext = () => {
+    setShowIntro(false);
+    // Allow modal close transition to settle before scrolling
+    setTimeout(() => {
+      sectionRef.current?.nextElementSibling?.scrollIntoView({
+        behavior: "smooth",
+      });
+    }, 150);
   };
 
   return (
@@ -71,21 +126,21 @@ export default function HeroCover() {
       {/* Centre content */}
       <div className={`hero-content ${visible ? "hero-visible" : ""}`}>
         <h1 className="hero-title">
-          <span className="hero-title-line">After Dark:</span>
+          <span className="hero-title-line">Day and Night:</span>
           <span className="hero-subtitle-line">
             How the Same Journey Changes
           </span>
         </h1>
 
         <p className="hero-description">
-          The point is not to declare one option right or wrong,
+          The point is not to decide which journey is better,
           <br />
-          but to show how the same journey asks different things
+          but to show how the same route asks different things
           <br />
-          of the traveller after dark.
+          of the traveller in daylight and after dark.
         </p>
 
-        <button onClick={scrollToContent} className="hero-cta" type="button">
+        <button onClick={openIntro} className="hero-cta" type="button">
           Begin exploring
         </button>
       </div>
@@ -102,6 +157,57 @@ export default function HeroCover() {
           <path d="M12 0L13.8 10.2L24 12L13.8 13.8L12 24L10.2 13.8L0 12L10.2 10.2L12 0Z" />
         </svg>
       </div>
+
+      {/* ── Intro modal: "What changes after dark?" ─────────────── */}
+      {showIntro && (
+        <div
+          className="intro-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="intro-modal-title"
+          onClick={() => setShowIntro(false)}
+        >
+          <div
+            className="intro-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="intro-modal-close"
+              onClick={() => setShowIntro(false)}
+              aria-label="Close"
+            >
+              <X size={18} />
+            </button>
+
+            <h2 id="intro-modal-title" className="intro-modal-title">
+              What changes after dark?
+            </h2>
+
+            <div className="intro-modal-grid">
+              {INTRO_DIMENSIONS.map(({ icon: Icon, title, description }) => (
+                <div key={title} className="intro-modal-card">
+                  <div className="intro-modal-icon">
+                    <Icon size={18} style={{ color: "var(--champagne-gold)" }} />
+                  </div>
+                  <h3 className="intro-modal-card-title">{title}</h3>
+                  <p className="intro-modal-card-desc">{description}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="intro-modal-footer">
+              <button
+                type="button"
+                className="hero-cta intro-modal-cta"
+                onClick={continueToNext}
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

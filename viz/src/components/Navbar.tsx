@@ -7,11 +7,10 @@ import { Moon } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/", label: "Home" },
-  { href: "/overview", label: "Context" },
   { href: "/compare", label: "Compare" },
+  { href: "/overview", label: "Context" },
   { href: "/unpack", label: "Mechanisms" },
   { href: "/fairness", label: "Fairness" },
-  { href: "/choose", label: "Choose" },
   { href: "/reflection", label: "Reflection" },
 ];
 
@@ -29,18 +28,44 @@ export default function Navbar() {
 
   const showBg = !isHome || scrolled;
 
+  // Home page uses a dusk-themed frosted nav; other pages keep the dark theme
+  const navBackground = showBg
+    ? isHome
+      ? "rgba(46, 36, 96, 0.55)"
+      : "var(--bg-secondary)"
+    : "transparent";
+  const navBorder = showBg
+    ? isHome
+      ? "rgba(240, 184, 122, 0.22)"
+      : "var(--border-subtle)"
+    : "transparent";
+
+  const brandColor = isHome ? "#fef5e8" : "var(--text-primary)";
+  const brandAccent = isHome ? "#f0b87a" : "var(--accent-amber)";
+  const linkInactiveColor = isHome ? "#f4d9b8" : "var(--text-secondary)";
+  const linkActiveColor = isHome ? "#fff4e2" : "var(--champagne-gold)";
+  const linkActiveBg = isHome
+    ? "rgba(240, 184, 122, 0.22)"
+    : "rgba(201,169,110,0.1)";
+
   return (
     <nav
       className="fixed top-0 left-0 right-0 z-50 border-b transition-all duration-500"
       style={{
-        background: showBg ? "var(--bg-secondary)" : "transparent",
-        borderColor: showBg ? "var(--border-subtle)" : "transparent",
+        background: navBackground,
+        borderColor: navBorder,
+        backdropFilter: showBg && isHome ? "blur(10px)" : undefined,
+        WebkitBackdropFilter: showBg && isHome ? "blur(10px)" : undefined,
       }}
     >
       <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 font-semibold text-lg">
-          <Moon size={20} style={{ color: "var(--accent-amber)" }} />
-          <span>After Dark</span>
+        <Link
+          href="/"
+          className="flex items-center gap-2 font-semibold text-lg"
+          style={{ color: brandColor }}
+        >
+          <Moon size={20} style={{ color: brandAccent }} />
+          <span>Day and Night</span>
         </Link>
 
         <div className="flex items-center gap-1">
@@ -52,8 +77,8 @@ export default function Navbar() {
                 href={item.href}
                 className="px-3 py-1.5 rounded-md text-sm font-medium transition-colors"
                 style={{
-                  color: active ? "var(--champagne-gold)" : "var(--text-secondary)",
-                  background: active ? "rgba(201,169,110,0.1)" : "transparent",
+                  color: active ? linkActiveColor : linkInactiveColor,
+                  background: active ? linkActiveBg : "transparent",
                 }}
               >
                 {item.label}

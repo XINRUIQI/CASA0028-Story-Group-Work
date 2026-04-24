@@ -12,7 +12,42 @@ interface PersonaDef {
   accent: string;
   focusDimensions: string[];
   insight: string;
+  need: string;
 }
+
+export interface PersonaRoute {
+  origin: string;
+  dest: string;
+  oName: string;
+  dName: string;
+}
+
+export const PERSONA_ROUTES: Record<PersonaId, PersonaRoute> = {
+  student: {
+    origin: "940GZZLUESQ",
+    dest: "HUBSVS",
+    oName: "Euston Square",
+    dName: "Seven Sisters",
+  },
+  budget: {
+    origin: "940GZZLUSTD",
+    dest: "940GZZLUBXN",
+    oName: "Stratford",
+    dName: "Brixton",
+  },
+  nightworker: {
+    origin: "940GZZLUKSX",
+    dest: "940GZZLUBKG",
+    oName: "King's Cross",
+    dName: "Barking",
+  },
+  unfamiliar: {
+    origin: "940GZZLUPAC",
+    dest: "HUBGNW",
+    oName: "Paddington",
+    dName: "Greenwich",
+  },
+};
 
 export const PERSONA_DEFS: PersonaDef[] = [
   {
@@ -22,6 +57,7 @@ export const PERSONA_DEFS: PersonaDef[] = [
     accent: "var(--champagne-gold)",
     focusDimensions: ["waiting_burden", "activity_context"],
     insight: "Waiting alone matters most. Activity and 'someone around' feeling are key.",
+    need: "I don't want to wait on an empty platform — I need to feel someone's around.",
   },
   {
     id: "budget",
@@ -30,6 +66,7 @@ export const PERSONA_DEFS: PersonaDef[] = [
     accent: "var(--accent-amber)",
     focusDimensions: ["functional_cost", "service_uncertainty"],
     insight: "Fare penalties and missed-connection recovery cost are the main concern.",
+    need: "I need the cheapest option — and no heavy penalty if I miss a connection.",
   },
   {
     id: "nightworker",
@@ -38,6 +75,7 @@ export const PERSONA_DEFS: PersonaDef[] = [
     accent: "var(--accent-emerald)",
     focusDimensions: ["service_uncertainty", "waiting_burden"],
     insight: "Service reliability and late-hour continuity are what this traveller needs.",
+    need: "I need services that still run when my shift ends — and that I can rely on.",
   },
   {
     id: "unfamiliar",
@@ -46,6 +84,7 @@ export const PERSONA_DEFS: PersonaDef[] = [
     accent: "var(--accent-rose)",
     focusDimensions: ["functional_cost", "support_access"],
     insight: "Transfer complexity and error recovery dominate the experience.",
+    need: "I need a simple route — and help nearby if I get lost or make a mistake.",
   },
 ];
 
