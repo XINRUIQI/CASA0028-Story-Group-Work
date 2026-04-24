@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Build a static explainability dataset for the fairness page.
 
-This script turns the processed night-time datasets into a compact JSON file
-that the Next.js frontend can read directly on static deployments.
+This version avoids borough-wide simple averages for the main map layers.
+Instead it measures how much of each borough's internal MSOA geography shows:
+1. a visible night-time activity footprint,
+2. support coverage that still clears a meaningful threshold, and
+3. hotspots where activity remains but support is thin.
 """
 
 from __future__ import annotations
@@ -33,21 +36,37 @@ INNER_BOROUGHS = {
     "Westminster",
 }
 
+THRESHOLDS = {
+    "activity_footprint_min": 0.05,
+    "support_coverage_min": 0.12,
+    "mismatch_activity_min": 0.03,
+    "mismatch_support_max": 0.09,
+}
+
 LAYER_META = {
-    "dependence": {
-        "label": "Night-time dependence",
-        "accent": "var(--accent-blue)",
-        "description": "Higher scores indicate places where after-dark activity remains present but baseline support is comparatively thin, so the night network matters more.",
-    },
-    "burden": {
-        "label": "Night burden",
-        "accent": "var(--accent-rose)",
-        "description": "Higher scores indicate a heavier after-dark burden once limited support and recent supply contraction are combined.",
-    },
-    "mismatch": {
-        "label": "Dependence-support mismatch",
+    "mismatch_hotspots": {
+        "label": "Activity-support mismatch",
         "accent": "var(--accent-amber)",
-        "description": "Higher scores indicate boroughs where late-night dependence is stronger than the support currently on offer.",
+        "description": (
+            "Share of MSOAs where late-night activity remains visible but support stays thin. "
+            "This is the strongest fairness signal on the map."
+        ),
+    },
+    "activity_footprint": {
+        "label": "Night activity footprint",
+        "accent": "var(--accent-blue)",
+        "description": (
+            "Share of MSOAs that still clear the activity threshold after dark. "
+            "This asks where the night network still matters spatially within the borough."
+        ),
+    },
+    "support_coverage": {
+        "label": "Support coverage",
+        "accent": "var(--accent-emerald)",
+        "description": (
+            "Share of MSOAs where support intensity still clears a meaningful threshold. "
+            "Higher scores mean more of the borough stays recoverable after dark."
+        ),
     },
 }
 
@@ -56,40 +75,27 @@ def mean(values: list[float]) -> float:
     return sum(values) / len(values) if values else 0.0
 
 
-def normalize(values_by_key: dict[str, float]) -> dict[str, float]:
-    if not values_by_key:
-        return {}
-    values = list(values_by_key.values())
-    low = min(values)
-    high = max(values)
-    spread = high - low
-    if spread == 0:
-        return {key: 0.0 for key in values_by_key}
-    return {key: (value - low) / spread for key, value in values_by_key.items()}
+def pstdev(values: list[float]) -> float:
+    if len(values) <= 1:
+        return 0.0
+    avg = mean(values)
+    return (sum((value - avg) ** 2 for value in values) / len(values)) ** 0.5
 
 
-def extract_borough(msoa_name: str) -> str:
-    return msoa_name.rsplit(" ", 1)[0].strip()
+def extract_borough(area_name: str) -> str:
+    return area_name.rsplit(" ", 1)[0].strip()
 
 
-def load_borough_metrics() -> dict[str, dict[str, float | str]]:
-    support_activity: dict[str, dict[str, list[float]]] = defaultdict(
-        lambda: {"support": [], "activity": []}
-    )
+def load_borough_metrics() -> dict[str, dict[str, float | int | str]]:
+    rows_by_borough: dict[str, list[tuple[float, float]]] = defaultdict(list)
     with (PROCESSED_DIR / "msoa_night_support_activity.csv").open(
         newline="", encoding="utf-8"
     ) as handle:
         for row in csv.DictReader(handle):
             borough = extract_borough(row["msoa_name"])
-            support_activity[borough]["support"].append(float(row["support_index"] or 0.0))
-            support_activity[borough]["activity"].append(float(row["activity_index"] or 0.0))
-
-    support_avg = {
-        borough: mean(values["support"]) for borough, values in support_activity.items()
-    }
-    activity_avg = {
-        borough: mean(values["activity"]) for borough, values in support_activity.items()
-    }
+            activity = float(row["activity_index"] or 0.0)
+            support = float(row["support_index"] or 0.0)
+            rows_by_borough[borough].append((activity, support))
 
     supply_change: dict[str, list[float]] = defaultdict(list)
     with (PROCESSED_DIR / "borough_night_supply_change.csv").open(
@@ -98,31 +104,40 @@ def load_borough_metrics() -> dict[str, dict[str, float | str]]:
         for row in csv.DictReader(handle):
             supply_change[row["borough_name"]].append(float(row["pct_change"] or 0.0))
 
-    supply_avg = {borough: mean(values) for borough, values in supply_change.items()}
-    boroughs = sorted(set(support_avg) & set(activity_avg) & set(supply_avg))
+    borough_metrics: dict[str, dict[str, float | int | str]] = {}
+    for borough, rows in sorted(rows_by_borough.items()):
+        activity_values = [row[0] for row in rows]
+        support_values = [row[1] for row in rows]
+        total = len(rows)
 
-    support_norm = normalize({borough: support_avg[borough] for borough in boroughs})
-    activity_norm = normalize({borough: activity_avg[borough] for borough in boroughs})
-    contraction_norm = normalize(
-        {borough: max(0.0, -supply_avg[borough]) for borough in boroughs}
-    )
+        activity_footprint_count = sum(
+            activity >= THRESHOLDS["activity_footprint_min"]
+            for activity in activity_values
+        )
+        support_coverage_count = sum(
+            support >= THRESHOLDS["support_coverage_min"]
+            for support in support_values
+        )
+        mismatch_hotspot_count = sum(
+            activity >= THRESHOLDS["mismatch_activity_min"]
+            and support <= THRESHOLDS["mismatch_support_max"]
+            for activity, support in rows
+        )
 
-    borough_metrics: dict[str, dict[str, float | str]] = {}
-    for borough in boroughs:
-        dependence = 0.65 * activity_norm[borough] + 0.35 * (1 - support_norm[borough])
-        support_score = 0.75 * support_norm[borough] + 0.25 * (1 - contraction_norm[borough])
-        burden = 0.55 * dependence + 0.45 * (1 - support_score)
-        mismatch = max(0.0, dependence - support_score)
-
+        supply_values = supply_change.get(borough, [])
         borough_metrics[borough] = {
             "bucket": "Inner" if borough in INNER_BOROUGHS else "Outer",
-            "activity_index": round(activity_avg[borough], 4),
-            "support_index": round(support_avg[borough], 4),
-            "supply_change": round(supply_avg[borough], 4),
-            "dependence": round(dependence, 4),
-            "support_score": round(support_score, 4),
-            "burden": round(burden, 4),
-            "mismatch": round(mismatch, 4),
+            "msoa_count": total,
+            "activity_index_mean": round(mean(activity_values), 4),
+            "support_index_mean": round(mean(support_values), 4),
+            "supply_change_mean": round(mean(supply_values), 4),
+            "supply_change_spread": round(pstdev(supply_values), 4),
+            "activity_footprint": round(activity_footprint_count / total, 4),
+            "activity_footprint_count": activity_footprint_count,
+            "support_coverage": round(support_coverage_count / total, 4),
+            "support_coverage_count": support_coverage_count,
+            "mismatch_hotspots": round(mismatch_hotspot_count / total, 4),
+            "mismatch_hotspots_count": mismatch_hotspot_count,
         }
 
     return borough_metrics
@@ -184,15 +199,21 @@ def load_commute_snapshot() -> dict[str, float | str]:
         "outer_to_inner": round(outer_to_inner, 4),
         "inner_to_inner": round(inner_to_inner, 4),
         "narrative": (
-            "At night, outer-London residents are more likely to stay within outer London "
-            "than travel into the centre, while inner-London residents still concentrate heavily inward."
+            "Outer-London night work is more likely to stay outer-to-outer, while the "
+            "centre still concentrates the strongest night activity footprint."
         ),
     }
 
 
-def build_inner_outer_summary(boroughs: dict[str, dict[str, float | str]]) -> list[dict[str, float | str]]:
+def build_inner_outer_summary(
+    boroughs: dict[str, dict[str, float | int | str]],
+) -> list[dict[str, float | str]]:
     summary = []
-    for metric in ["dependence", "support_score", "burden", "mismatch"]:
+    for metric, label in [
+        ("activity_footprint", "Night footprint"),
+        ("support_coverage", "Support coverage"),
+        ("mismatch_hotspots", "Mismatch hotspots"),
+    ]:
         inner_values = [
             float(values[metric]) for values in boroughs.values() if values["bucket"] == "Inner"
         ]
@@ -202,7 +223,7 @@ def build_inner_outer_summary(boroughs: dict[str, dict[str, float | str]]) -> li
         summary.append(
             {
                 "metric": metric,
-                "label": "Support" if metric == "support_score" else metric.capitalize(),
+                "label": label,
                 "inner": round(mean(inner_values), 4),
                 "outer": round(mean(outer_values), 4),
             }
@@ -210,38 +231,69 @@ def build_inner_outer_summary(boroughs: dict[str, dict[str, float | str]]) -> li
     return summary
 
 
+def _eligible_boroughs(
+    boroughs: dict[str, dict[str, float | int | str]],
+) -> list[tuple[str, dict[str, float | int | str]]]:
+    return [
+        (name, values)
+        for name, values in boroughs.items()
+        if int(values["msoa_count"]) >= 5
+    ]
+
+
 def build_highlights(
-    boroughs: dict[str, dict[str, float | str]],
+    boroughs: dict[str, dict[str, float | int | str]],
     audience_shift: list[dict[str, float | str]],
     inner_outer: list[dict[str, float | str]],
-    commute_snapshot: dict[str, float | str],
 ) -> list[dict[str, str]]:
-    top_burden = max(boroughs.items(), key=lambda item: float(item[1]["burden"]))
-    top_mismatch = max(boroughs.items(), key=lambda item: float(item[1]["mismatch"]))
-    support_row = next(item for item in inner_outer if item["metric"] == "support_score")
-    burden_row = next(item for item in inner_outer if item["metric"] == "burden")
+    eligible = _eligible_boroughs(boroughs)
+    top_activity = max(eligible, key=lambda item: float(item[1]["activity_footprint"]))
+    top_support = max(eligible, key=lambda item: float(item[1]["support_coverage"]))
+    top_mismatch = max(eligible, key=lambda item: float(item[1]["mismatch_hotspots"]))
+    footprint_row = next(item for item in inner_outer if item["metric"] == "activity_footprint")
+    mismatch_row = next(item for item in inner_outer if item["metric"] == "mismatch_hotspots")
     top_shift = audience_shift[0]
 
     return [
         {
-            "title": "Highest night burden",
-            "value": top_burden[0],
-            "detail": f"Composite burden score {float(top_burden[1]['burden']) * 100:.0f}/100",
+            "title": "Widest night footprint",
+            "value": top_activity[0],
+            "detail": (
+                f"{float(top_activity[1]['activity_footprint']) * 100:.0f}% of its MSOAs "
+                "still clear the night-activity threshold."
+            ),
         },
         {
-            "title": "Largest mismatch",
+            "title": "Strongest support coverage",
+            "value": top_support[0],
+            "detail": (
+                f"{float(top_support[1]['support_coverage']) * 100:.0f}% of its MSOAs "
+                "retain above-threshold support intensity."
+            ),
+        },
+        {
+            "title": "Sharpest mismatch",
             "value": top_mismatch[0],
-            "detail": f"Dependence exceeds support by {float(top_mismatch[1]['mismatch']) * 100:.0f} points",
+            "detail": (
+                f"{float(top_mismatch[1]['mismatch_hotspots']) * 100:.0f}% of its MSOAs "
+                "show activity without comparable support."
+            ),
         },
         {
-            "title": "Outer vs inner",
-            "value": f"{(float(burden_row['outer']) - float(burden_row['inner'])) * 100:+.0f} burden pts",
-            "detail": f"Outer boroughs also score {(float(support_row['outer']) - float(support_row['inner'])) * 100:+.0f} support pts relative to inner boroughs",
+            "title": "Inner vs outer split",
+            "value": f"{(float(footprint_row['inner']) - float(footprint_row['outer'])) * 100:+.0f} footprint pts",
+            "detail": (
+                f"Outer boroughs carry {(float(mismatch_row['outer']) - float(mismatch_row['inner'])) * 100:+.0f} "
+                "more mismatch points on average."
+            ),
         },
         {
             "title": "Night-user shift",
             "value": str(top_shift["label"]),
-            "detail": f"Night share moves {float(top_shift['delta']) * 100:+.0f} percentage points relative to daytime bus use; outer-to-outer night commuting is {float(commute_snapshot['outer_to_outer']) * 100:.0f}%.",
+            "detail": (
+                f"Night bus share shifts {float(top_shift['delta']) * 100:+.0f} percentage points "
+                "relative to daytime composition."
+            ),
         },
     ]
 
@@ -251,19 +303,21 @@ def main() -> None:
     audience_shift = load_audience_shift()
     commute_snapshot = load_commute_snapshot()
     inner_outer = build_inner_outer_summary(boroughs)
-    highlights = build_highlights(boroughs, audience_shift, inner_outer, commute_snapshot)
+    highlights = build_highlights(boroughs, audience_shift, inner_outer)
 
     payload = {
         "layerMeta": LAYER_META,
+        "thresholds": THRESHOLDS,
         "boroughs": boroughs,
         "audienceShift": audience_shift,
         "innerOuter": inner_outer,
         "commuteSnapshot": commute_snapshot,
         "highlights": highlights,
         "method": [
-            "Dependence combines borough-level night activity with thin baseline support.",
-            "Support blends current support intensity with recent borough-level supply change.",
-            "Burden and mismatch are comparative indices for explanation, not causal proof.",
+            "Main map layers use borough shares of qualifying MSOAs, not simple borough means.",
+            "Night footprint counts MSOAs with activity_index >= 0.05; support coverage counts MSOAs with support_index >= 0.12.",
+            "Mismatch hotspots count MSOAs where activity_index >= 0.03 but support_index <= 0.09.",
+            "Map colours are quantile-scaled across boroughs so non-central variation remains visible.",
         ],
     }
 
