@@ -32,9 +32,9 @@ export const FIXED_ROUTE_PRESETS = {
     destinationName: "Barking",
   },
   unfamiliar: {
-    origin: "940GZZLUPAC",
-    destination: "HUBGNW",
-    originName: "Paddington",
+    origin: "940GZZLULVT",
+    destination: "940GZZDLGRE",
+    originName: "Liverpool Street",
     destinationName: "Greenwich",
   },
 } as const;

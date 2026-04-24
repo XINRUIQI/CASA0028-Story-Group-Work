@@ -634,7 +634,7 @@ export default function FairnessPanel() {
       mapRef.current = null;
       setReady(false);
     };
-  }, []);
+  }, [data]);
 
   useEffect(() => {
     if (!ready || !mapRef.current || !geojson || !data || !metricScales) return;

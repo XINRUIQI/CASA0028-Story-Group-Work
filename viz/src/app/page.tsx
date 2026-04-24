@@ -101,7 +101,7 @@ const FIXED_ROUTE_OPTIONS = [
   },
   {
     key: "unfamiliar",
-    label: "Paddington → Greenwich",
+    label: "Liverpool Street → Greenwich",
     description: "Unfamiliar area",
   },
 ] as const;

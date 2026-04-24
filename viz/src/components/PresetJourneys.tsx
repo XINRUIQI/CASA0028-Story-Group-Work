@@ -62,7 +62,7 @@ const PRESETS: PresetRoute[] = [
     id: "unfamiliar",
     icon: <MapPinOff size={18} />,
     label: "Unfamiliar traveller",
-    description: "Paddington to Greenwich — first time in London",
+    description: "Liverpool Street to Greenwich — first time in London",
     originName: FIXED_ROUTE_PRESETS.unfamiliar.originName,
     originId: FIXED_ROUTE_PRESETS.unfamiliar.origin,
     destName: FIXED_ROUTE_PRESETS.unfamiliar.destinationName,
