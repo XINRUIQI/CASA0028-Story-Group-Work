@@ -8,8 +8,9 @@ const MAPBOX_TOKEN =
   process.env.NEXT_PUBLIC_MAPBOX_TOKEN ||
   "pk.eyJ1IjoibGV2aW5lbGl1IiwiYSI6ImNta21vc3doOTBleGYza3IycDNsOXRidXQifQ.SdtOnvfZEml6QGLmnnduDQ";
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
+const FAIRNESS_DATA_VERSION = "20260424-1";
 const GEOJSON_URL = `${BASE_PATH}/london-boroughs.geojson`;
-const DATA_URL = `${BASE_PATH}/static-data/fairness-explainability.json`;
+const DATA_URL = `${BASE_PATH}/static-data/fairness-explainability.json?v=${FAIRNESS_DATA_VERSION}`;
 const CENTER: [number, number] = [-0.118, 51.509];
 
 type FairnessMetric =
@@ -69,13 +70,179 @@ interface CommuteSnapshot {
 
 interface FairnessExplainability {
   layerMeta: Record<FairnessMetric, LayerMeta>;
-  thresholds: Record<string, number>;
+  thresholds?: Record<string, number>;
   boroughs: Record<string, BoroughMetric>;
   audienceShift: AudienceShiftItem[];
   innerOuter: InnerOuterItem[];
   commuteSnapshot: CommuteSnapshot;
   highlights: HighlightItem[];
   method: string[];
+}
+
+const DEFAULT_THRESHOLDS = {
+  activity_footprint_min: 0.05,
+  support_coverage_min: 0.12,
+  mismatch_activity_min: 0.03,
+  mismatch_support_max: 0.09,
+} as const;
+
+const DEFAULT_LAYER_META: Record<FairnessMetric, LayerMeta> = {
+  mismatch_hotspots: {
+    label: "Activity-support mismatch",
+    accent: "var(--accent-amber)",
+    description: "Share of MSOAs where late-night activity remains visible but support stays thin.",
+  },
+  activity_footprint: {
+    label: "Night activity footprint",
+    accent: "var(--accent-blue)",
+    description: "Share of MSOAs that still clear the activity threshold after dark.",
+  },
+  support_coverage: {
+    label: "Support coverage",
+    accent: "var(--accent-emerald)",
+    description: "Share of MSOAs where support intensity still clears a meaningful threshold.",
+  },
+};
+
+function toNumber(value: unknown, fallback = 0): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object";
+}
+
+function normalizeFairnessPayload(raw: unknown): FairnessExplainability {
+  const payload = isRecord(raw) ? raw : {};
+  const rawLayerMeta = payload.layerMeta && typeof payload.layerMeta === "object"
+    ? payload.layerMeta as Record<string, Record<string, unknown>>
+    : {};
+  const rawThresholds = payload.thresholds && typeof payload.thresholds === "object"
+    ? payload.thresholds as Record<string, unknown>
+    : {};
+  const rawBoroughs = payload.boroughs && typeof payload.boroughs === "object"
+    ? payload.boroughs as Record<string, Record<string, unknown>>
+    : {};
+
+  const boroughs = Object.fromEntries(
+    Object.entries(rawBoroughs).map(([name, borough]) => {
+      const activityFootprint = toNumber(
+        borough.activity_footprint,
+        toNumber(borough.dependence),
+      );
+      const supportCoverage = toNumber(
+        borough.support_coverage,
+        toNumber(borough.support_score, Math.max(0, 1 - toNumber(borough.burden))),
+      );
+      const mismatchHotspots = toNumber(
+        borough.mismatch_hotspots,
+        toNumber(borough.mismatch),
+      );
+      const msoaCount = Math.max(1, Math.round(toNumber(borough.msoa_count, 1)));
+
+      return [
+        name,
+        {
+          bucket: borough.bucket === "Inner" ? "Inner" : "Outer",
+          msoa_count: msoaCount,
+          activity_index_mean: toNumber(
+            borough.activity_index_mean,
+            toNumber(borough.activity_index),
+          ),
+          support_index_mean: toNumber(
+            borough.support_index_mean,
+            toNumber(borough.support_index),
+          ),
+          supply_change_mean: toNumber(
+            borough.supply_change_mean,
+            toNumber(borough.supply_change),
+          ),
+          supply_change_spread: toNumber(borough.supply_change_spread),
+          activity_footprint: activityFootprint,
+          activity_footprint_count: Math.round(
+            toNumber(borough.activity_footprint_count, activityFootprint * msoaCount),
+          ),
+          support_coverage: supportCoverage,
+          support_coverage_count: Math.round(
+            toNumber(borough.support_coverage_count, supportCoverage * msoaCount),
+          ),
+          mismatch_hotspots: mismatchHotspots,
+          mismatch_hotspots_count: Math.round(
+            toNumber(borough.mismatch_hotspots_count, mismatchHotspots * msoaCount),
+          ),
+        } satisfies BoroughMetric,
+      ];
+    }),
+  ) as Record<string, BoroughMetric>;
+
+  const highlights = Array.isArray(payload.highlights)
+    ? payload.highlights.filter(isRecord).map((item) => ({
+      title: String(item.title || ""),
+      value: String(item.value || ""),
+      detail: String(item.detail || ""),
+    }))
+    : [];
+
+  const audienceShift = Array.isArray(payload.audienceShift)
+    ? payload.audienceShift.filter(isRecord).map((item) => ({
+      dimension: String(item.dimension || ""),
+      category: String(item.category || ""),
+      label: String(item.label || ""),
+      day_share: toNumber(item.day_share),
+      night_share: toNumber(item.night_share),
+      delta: toNumber(item.delta),
+    }))
+    : [];
+
+  const innerOuter = Array.isArray(payload.innerOuter)
+    ? payload.innerOuter.filter(isRecord).map((item) => ({
+      metric: String(item.metric || ""),
+      label: String(item.label || ""),
+      inner: toNumber(item.inner),
+      outer: toNumber(item.outer),
+    }))
+    : [];
+
+  const commuteRaw = isRecord(payload.commuteSnapshot)
+    ? payload.commuteSnapshot
+    : {};
+
+  const thresholds = {
+    ...DEFAULT_THRESHOLDS,
+    activity_footprint_min: toNumber(rawThresholds.activity_footprint_min, DEFAULT_THRESHOLDS.activity_footprint_min),
+    support_coverage_min: toNumber(rawThresholds.support_coverage_min, DEFAULT_THRESHOLDS.support_coverage_min),
+    mismatch_activity_min: toNumber(rawThresholds.mismatch_activity_min, DEFAULT_THRESHOLDS.mismatch_activity_min),
+    mismatch_support_max: toNumber(rawThresholds.mismatch_support_max, DEFAULT_THRESHOLDS.mismatch_support_max),
+  };
+
+  return {
+    layerMeta: {
+      mismatch_hotspots: {
+        ...DEFAULT_LAYER_META.mismatch_hotspots,
+        ...(rawLayerMeta.mismatch_hotspots || {}),
+      },
+      activity_footprint: {
+        ...DEFAULT_LAYER_META.activity_footprint,
+        ...(rawLayerMeta.activity_footprint || rawLayerMeta.dependence || {}),
+      },
+      support_coverage: {
+        ...DEFAULT_LAYER_META.support_coverage,
+        ...(rawLayerMeta.support_coverage || rawLayerMeta.burden || {}),
+      },
+    },
+    thresholds,
+    boroughs,
+    audienceShift,
+    innerOuter,
+    commuteSnapshot: {
+      outer_to_outer: toNumber(commuteRaw.outer_to_outer),
+      outer_to_inner: toNumber(commuteRaw.outer_to_inner),
+      inner_to_inner: toNumber(commuteRaw.inner_to_inner),
+      narrative: String(commuteRaw.narrative || ""),
+    },
+    highlights,
+    method: Array.isArray(payload.method) ? payload.method.map((item) => String(item)) : [],
+  };
 }
 
 interface MetricScale {
@@ -339,18 +506,18 @@ export default function FairnessPanel() {
   useEffect(() => {
     let stale = false;
     Promise.all([
-      fetch(DATA_URL).then((response) => {
+      fetch(DATA_URL, { cache: "no-store" }).then((response) => {
         if (!response.ok) throw new Error("Fairness explainability data missing");
-        return response.json() as Promise<FairnessExplainability>;
+        return response.json();
       }),
-      fetch(GEOJSON_URL).then((response) => {
+      fetch(GEOJSON_URL, { cache: "no-store" }).then((response) => {
         if (!response.ok) throw new Error("London borough boundary file missing");
         return response.json() as Promise<GeoJSON.FeatureCollection>;
       }),
     ])
       .then(([json, geo]) => {
         if (stale) return;
-        setData(json);
+        setData(normalizeFairnessPayload(json));
         setGeojson(geo);
       })
       .catch((cause) => {
@@ -497,12 +664,13 @@ export default function FairnessPanel() {
   );
   const activeMeta = data.layerMeta[activeMetric];
   const activeScale = metricScales[activeMetric];
+  const thresholds = data.thresholds ?? DEFAULT_THRESHOLDS;
   const thresholdText =
     activeMetric === "activity_footprint"
-      ? `Threshold: activity_index >= ${data.thresholds.activity_footprint_min.toFixed(2)}`
+      ? `Threshold: activity_index >= ${thresholds.activity_footprint_min.toFixed(2)}`
       : activeMetric === "support_coverage"
-        ? `Threshold: support_index >= ${data.thresholds.support_coverage_min.toFixed(2)}`
-        : `Threshold: activity_index >= ${data.thresholds.mismatch_activity_min.toFixed(2)} and support_index <= ${data.thresholds.mismatch_support_max.toFixed(2)}`;
+        ? `Threshold: support_index >= ${thresholds.support_coverage_min.toFixed(2)}`
+        : `Threshold: activity_index >= ${thresholds.mismatch_activity_min.toFixed(2)} and support_index <= ${thresholds.mismatch_support_max.toFixed(2)}`;
 
   return (
     <div className="fairness-v2-wrap">
