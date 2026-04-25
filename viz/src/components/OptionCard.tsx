@@ -1,7 +1,6 @@
 "use client";
 
 import type { CardData, Journey, JourneyRecoveryResult } from "@/lib/api";
-import Link from "next/link";
 import {
   Clock,
   Footprints,
@@ -224,11 +223,13 @@ export default function OptionCard({
   origin,
   destination,
 }: OptionCardProps) {
+  const displayTime = time === "00:00" ? "24:00" : time;
+
   if (!journey) {
     return (
       <div className="card opacity-60">
         <h3 className="font-semibold text-lg mb-2">
-          Option {LETTER[index]} · {time}
+          Option {LETTER[index]} · {displayTime}
         </h3>
         <p style={{ color: "var(--text-muted)" }}>
           No route available for this departure time.
@@ -290,7 +291,7 @@ export default function OptionCard({
           : "—",
       sub:
         wb.max_single_wait_min != null
-          ? `Longest single wait ${formatNum(wb.max_single_wait_min, 1)} min`
+          ? `single ~${formatNum(wb.max_single_wait_min, 1)} min`
           : undefined,
       tone: toneByMinutes(wb.total_expected_wait_min, 12, 5),
       source: "waiting_burden",
@@ -366,13 +367,13 @@ export default function OptionCard({
   ];
 
   return (
-    <div className="card flex flex-col">
+    <div className="card option-card">
       <h3 className="font-semibold text-lg mb-4">
         Option {LETTER[index]}{" "}
-        <span style={{ color: "var(--accent-amber)" }}>· {time}</span>
+        <span style={{ color: "var(--accent-amber)" }}>· {displayTime}</span>
       </h3>
 
-      <div className="grid grid-cols-2 gap-3 mb-4">
+      <div className="option-metrics-grid">
         {metrics.map((m) => {
           const isHi = highlighted.includes(m.key);
           const toneClass =
@@ -421,17 +422,6 @@ export default function OptionCard({
           );
         })}
       </div>
-
-      {origin && destination && (
-        <div className="mt-auto flex flex-col gap-2">
-          <Link
-            href={`/unpack?origin=${origin}&destination=${destination}&time=${time}`}
-            className="btn-secondary text-center text-sm"
-          >
-            View journey breakdown
-          </Link>
-        </div>
-      )}
 
     </div>
   );

@@ -3,10 +3,8 @@
 import { useState, useEffect, useMemo } from "react";
 import {
   PERSONA_DEFS,
-  PERSONA_ROUTES,
   type PersonaId,
 } from "@/components/PersonaSwitch";
-import { api } from "@/lib/api";
 
 const HOURS = [
   "18:00",
@@ -25,6 +23,26 @@ interface HourlyPoint {
   waiting_burden: number;
   support_open: number;
   recovery_penalty: number;
+}
+
+type AllCurves = Record<string, Record<string, HourlyPoint | null>>;
+
+const STATIC_PREFIX = process.env.NEXT_PUBLIC_BASE_PATH || "";
+
+let _curveCache: AllCurves | null = null;
+let _curvePromise: Promise<AllCurves> | null = null;
+
+function loadAllCurves(): Promise<AllCurves> {
+  if (_curveCache) return Promise.resolve(_curveCache);
+  if (_curvePromise) return _curvePromise;
+  _curvePromise = fetch(`${STATIC_PREFIX}/static-data/persona-curves.json`)
+    .then((r) => (r.ok ? r.json() : {}))
+    .catch(() => ({}))
+    .then((data: AllCurves) => {
+      _curveCache = data;
+      return data;
+    });
+  return _curvePromise;
 }
 
 /* ── Portrait SVGs ── */
@@ -252,7 +270,10 @@ function HourlyLineChart({
 }: {
   curves: Record<string, HourlyPoint | null>;
 }) {
-  const hours = HOURS.filter((h) => curves[h] !== undefined);
+  const hours = useMemo(
+    () => HOURS.filter((h) => curves[h] !== undefined),
+    [curves],
+  );
 
   const normed = useMemo(() => {
     if (hours.length === 0) return {};
@@ -392,40 +413,23 @@ export default function PersonaInsightsPanel({
     if (personaProp === undefined) setPersonaState(p);
   };
 
-  const [curves, setCurves] = useState<Record<string, HourlyPoint | null>>({});
-
-  const preset = persona ? PERSONA_ROUTES[persona] : null;
+  const [allCurves, setAllCurves] = useState<AllCurves | null>(_curveCache);
 
   useEffect(() => {
-    if (!preset) return;
+    if (_curveCache) {
+      setAllCurves(_curveCache);
+      return;
+    }
     let stale = false;
-    api
-      .compareCards(preset.origin, preset.dest, HOURS)
-      .then((res) => {
-        if (stale) return;
-        const pts: Record<string, HourlyPoint | null> = {};
-        for (const [t, opt] of Object.entries(res.options)) {
-          if (!opt) {
-            pts[t] = null;
-            continue;
-          }
-          const c = opt.cards as Record<string, Record<string, unknown>>;
-          pts[t] = {
-            duration_min: Number(c.functional_cost?.total_duration_min ?? 0),
-            waiting_burden: Number(
-              c.waiting_burden?.total_expected_wait_min ?? 0,
-            ),
-            support_open: Number(c.support_access?.total_support_open ?? 0),
-            recovery_penalty:
-              Number(c.service_uncertainty?.mean_headway_gap_ratio ?? 0) * 5,
-          };
-        }
-        setCurves(pts);
-      });
-    return () => {
-      stale = true;
-    };
-  }, [preset?.origin, preset?.dest]);
+    loadAllCurves().then((data) => {
+      if (!stale) setAllCurves(data);
+    });
+    return () => { stale = true; };
+  }, []);
+
+  const curves = persona && allCurves?.[persona]
+    ? (allCurves[persona] as Record<string, HourlyPoint | null>)
+    : null;
 
   return (
     <div className="persona-insights-panel">
@@ -467,7 +471,7 @@ export default function PersonaInsightsPanel({
           <p className="choose-chart-loading">
             Pick a traveller above to see their hourly burden curves.
           </p>
-        ) : Object.keys(curves).length === 0 ? (
+        ) : !curves ? (
           <p className="choose-chart-loading">Loading hourly data…</p>
         ) : (
           <HourlyLineChart curves={curves} />

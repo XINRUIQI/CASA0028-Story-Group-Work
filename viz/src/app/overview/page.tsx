@@ -367,16 +367,6 @@ export default function OverviewPage() {
           </div>
         </section>
 
-        {/* ── Transition to Mechanisms ── */}
-        <section className="reveal-section text-center">
-          <p className="text-sm max-w-md mx-auto mb-6" style={{ color: "var(--text-secondary)" }}>
-            These are city-wide averages. On a specific route, the changes may be
-            sharper — or more subtle. Look at the mechanisms behind the numbers.
-          </p>
-          <a href="/unpack" className="ov2-cta inline-block px-6 py-3">
-            Unpack the mechanisms &rarr;
-          </a>
-        </section>
       </div>
     </div>
   );

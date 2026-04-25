@@ -9,7 +9,6 @@ const NAV_ITEMS = [
   { href: "/", label: "Home" },
   { href: "/compare", label: "Compare" },
   { href: "/overview", label: "Context" },
-  { href: "/unpack", label: "Mechanisms" },
   { href: "/fairness", label: "Fairness" },
   { href: "/reflection", label: "Reflection" },
 ];
@@ -28,25 +27,15 @@ export default function Navbar() {
 
   const showBg = !isHome || scrolled;
 
-  // Home page uses a dusk-themed frosted nav; other pages keep the dark theme
-  const navBackground = showBg
-    ? isHome
-      ? "rgba(46, 36, 96, 0.55)"
-      : "var(--bg-secondary)"
-    : "transparent";
-  const navBorder = showBg
-    ? isHome
-      ? "rgba(240, 184, 122, 0.22)"
-      : "var(--border-subtle)"
-    : "transparent";
+  // Unified dusk-themed frosted nav across all pages
+  const navBackground = showBg ? "rgba(46, 36, 96, 0.55)" : "transparent";
+  const navBorder = showBg ? "rgba(240, 184, 122, 0.22)" : "transparent";
 
-  const brandColor = isHome ? "#fef5e8" : "var(--text-primary)";
-  const brandAccent = isHome ? "#f0b87a" : "var(--accent-amber)";
-  const linkInactiveColor = isHome ? "#f4d9b8" : "var(--text-secondary)";
-  const linkActiveColor = isHome ? "#fff4e2" : "var(--champagne-gold)";
-  const linkActiveBg = isHome
-    ? "rgba(240, 184, 122, 0.22)"
-    : "rgba(201,169,110,0.1)";
+  const brandColor = "#fef5e8";
+  const brandAccent = "#f0b87a";
+  const linkInactiveColor = "#f4d9b8";
+  const linkActiveColor = "#fff4e2";
+  const linkActiveBg = "rgba(240, 184, 122, 0.22)";
 
   return (
     <nav
@@ -54,8 +43,8 @@ export default function Navbar() {
       style={{
         background: navBackground,
         borderColor: navBorder,
-        backdropFilter: showBg && isHome ? "blur(10px)" : undefined,
-        WebkitBackdropFilter: showBg && isHome ? "blur(10px)" : undefined,
+        backdropFilter: showBg ? "blur(10px)" : undefined,
+        WebkitBackdropFilter: showBg ? "blur(10px)" : undefined,
       }}
     >
       <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">

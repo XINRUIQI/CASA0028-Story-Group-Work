@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, Suspense } from "react";
+import { useState, useEffect, useRef, useCallback, useTransition, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import JourneyTimelineCompare from "@/components/JourneyTimelineCompare";
@@ -123,6 +123,65 @@ function deriveCompareResult(
   };
 }
 
+/* ── Preset persona preload cache ─────────────────────────────
+ * All 4 personas have fixed OD pairs and use the same default
+ * times, so we can pre-fetch + pre-parse their static JSON
+ * into memory on module load. Switching persona then reads
+ * straight from this Map — zero network, zero JSON parse.
+ * ──────────────────────────────────────────────────────────── */
+
+interface PreloadedSnapshot {
+  cardsData: CompareCardsResult;
+  data: CompareResult;
+}
+
+const _preloadCache = new Map<string, PreloadedSnapshot>();
+const _preloadPromises = new Map<string, Promise<PreloadedSnapshot | null>>();
+
+function preloadCacheKey(origin: string, dest: string): string {
+  return `${origin}__${dest}`;
+}
+
+function preloadOnePersona(
+  origin: string,
+  dest: string,
+  times: string[],
+): Promise<PreloadedSnapshot | null> {
+  const key = preloadCacheKey(origin, dest);
+  const existing = _preloadPromises.get(key);
+  if (existing) return existing;
+
+  const p = Promise.all([
+    loadStaticCompareCards(origin, dest, times),
+    loadStaticCompareCards(origin, dest, [...DENSE_COMPARE_FALLBACK_TIMES]),
+  ]).then(([primary, dense]) => {
+    const merged = mergeCompareCards(times, primary, [dense]);
+    if (!merged) return null;
+    const snapshot: PreloadedSnapshot = {
+      cardsData: merged,
+      data: deriveCompareResult(origin, dest, times, merged),
+    };
+    _preloadCache.set(key, snapshot);
+    return snapshot;
+  });
+
+  _preloadPromises.set(key, p);
+  return p;
+}
+
+const _defaultTimes = DEFAULT_COMPARE_TIMES.split(",");
+
+function startPreloadAll() {
+  for (const pid of Object.keys(PERSONA_ROUTES) as PersonaId[]) {
+    const r = PERSONA_ROUTES[pid];
+    preloadOnePersona(r.origin, r.dest, _defaultTimes);
+  }
+}
+
+if (typeof window !== "undefined") {
+  startPreloadAll();
+}
+
 function getPresetPersona(
   origin?: string | null,
   destination?: string | null,
@@ -207,12 +266,18 @@ function CompareContent() {
     Record<string, JourneyRecoveryResult | null>
   >({});
   const [loading, setLoading] = useState(true);
+  const [transitioning, setTransitioning] = useState(false);
   const [error, setError] = useState("");
   const [mechanismsOpen, setMechanismsOpen] = useState(false);
+  const [, startTransition] = useTransition();
 
   const revealRef = useReveal();
   const mechanismsRef = useRef<HTMLDivElement | null>(null);
   const compareRequestRef = useRef(0);
+
+  const handlePersonaChange = useCallback((nextPersona: PersonaId | null) => {
+    if (nextPersona) setPersona(nextPersona);
+  }, []);
 
   const handleToggleMechanisms = () => {
     setMechanismsOpen((prev) => {
@@ -239,11 +304,72 @@ function CompareContent() {
     compareRequestRef.current = requestId;
     const isCurrentRequest = () => compareRequestRef.current === requestId;
 
-    setLoading(true);
     setError("");
-    setRecoveryByTime({});
-    setData(null);
-    setCardsData(null);
+
+    const loadRecoveryProfiles = (compare: CompareResult) => {
+      const entries = Object.entries(compare.options);
+      if (entries.length === 0) return;
+      Promise.all(
+        entries.map(async ([t, j]) => {
+          if (!j || !j.legs?.length) return [t, null] as const;
+          try {
+            const r = await api.getJourneyRecovery(j.legs, t);
+            return [t, r] as const;
+          } catch {
+            return [t, null] as const;
+          }
+        }),
+      ).then((pairs) => {
+        if (!isCurrentRequest()) return;
+        startTransition(() => {
+          const map: Record<string, JourneyRecoveryResult | null> = {};
+          for (const [t, r] of pairs) map[t] = r;
+          setRecoveryByTime(map);
+        });
+      });
+    };
+
+    const applySnapshot = (snap: PreloadedSnapshot) => {
+      setCardsData(snap.cardsData);
+      setData(snap.data);
+      setRecoveryByTime({});
+      setLoading(false);
+      setTransitioning(false);
+      void loadRecoveryProfiles(snap.data);
+    };
+
+    // Fast path: check in-memory preload cache (sync, zero delay)
+    const cacheKey = preloadCacheKey(origin, destination);
+    const cached = _preloadCache.get(cacheKey);
+    if (cached) {
+      applySnapshot(cached);
+      return;
+    }
+
+    // Medium path: preload promise in flight — wait for it
+    const inflight = _preloadPromises.get(cacheKey);
+    if (inflight) {
+      const hasExistingData = data !== null;
+      if (hasExistingData) setTransitioning(true);
+      else setLoading(true);
+
+      inflight.then((snap) => {
+        if (!isCurrentRequest()) return;
+        if (snap) {
+          applySnapshot(snap);
+        } else {
+          setError("Could not load comparison data for this journey.");
+          setLoading(false);
+          setTransitioning(false);
+        }
+      });
+      return;
+    }
+
+    // Slow path: non-preset route — fetch + optional live API
+    const hasExistingData = data !== null;
+    if (hasExistingData) setTransitioning(true);
+    else setLoading(true);
 
     Promise.all([
       loadStaticCompareCards(origin, destination, times),
@@ -251,53 +377,37 @@ function CompareContent() {
     ])
       .then(([staticCards, denseCards]) => {
         if (!isCurrentRequest()) return;
-
         const staticMerged = mergeCompareCards(times, staticCards, [denseCards]);
 
-        const loadRecoveryProfiles = (compare: CompareResult) => {
-          const entries = Object.entries(compare.options);
-          if (entries.length === 0) return Promise.resolve();
-
-          return Promise.all(
-            entries.map(async ([t, j]) => {
-              if (!j || !j.legs?.length) return [t, null] as const;
-              try {
-                const r = await api.getJourneyRecovery(j.legs, t);
-                return [t, r] as const;
-              } catch {
-                return [t, null] as const;
-              }
-            }),
-          ).then((pairs) => {
-            if (!isCurrentRequest()) return;
-            const map: Record<string, JourneyRecoveryResult | null> = {};
-            for (const [t, r] of pairs) map[t] = r;
-            setRecoveryByTime(map);
-          });
-        };
-
         if (staticMerged) {
-          const staticCompare = deriveCompareResult(origin, destination, times, staticMerged);
-          setCardsData(staticMerged);
-          setData(staticCompare);
-          setLoading(false);
-          void loadRecoveryProfiles(staticCompare);
+          const snap: PreloadedSnapshot = {
+            cardsData: staticMerged,
+            data: deriveCompareResult(origin, destination, times, staticMerged),
+          };
+          _preloadCache.set(cacheKey, snap);
+          applySnapshot(snap);
         }
 
         return api.compareCards(origin, destination, times)
           .then((liveCards) => {
             if (!isCurrentRequest()) return;
-
             const merged = mergeCompareCards(times, liveCards, [staticCards, denseCards]);
             if (!merged) {
-              throw new Error("Could not load comparison data for this journey.");
+              if (!staticMerged) throw new Error("Could not load comparison data for this journey.");
+              return;
             }
-
-            const compare = deriveCompareResult(origin, destination, times, merged);
-            setCardsData(merged);
-            setData(compare);
-            setLoading(false);
-            void loadRecoveryProfiles(compare);
+            const snap: PreloadedSnapshot = {
+              cardsData: merged,
+              data: deriveCompareResult(origin, destination, times, merged),
+            };
+            _preloadCache.set(cacheKey, snap);
+            startTransition(() => {
+              setCardsData(snap.cardsData);
+              setData(snap.data);
+              setLoading(false);
+              setTransitioning(false);
+            });
+            void loadRecoveryProfiles(snap.data);
           })
           .catch(() => {
             if (!isCurrentRequest()) return;
@@ -310,6 +420,7 @@ function CompareContent() {
         if (!isCurrentRequest()) return;
         setError(e.message);
         setLoading(false);
+        setTransitioning(false);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [origin, destination, timesParam]);
@@ -328,7 +439,8 @@ function CompareContent() {
   }
 
   return (
-    <div ref={revealRef} className="max-w-6xl mx-auto px-6 pt-20 pb-16">
+    <div className="compare-page">
+      <div ref={revealRef} className="max-w-6xl mx-auto px-6 pt-20 pb-16">
       {/* ── Header ── */}
       <section className="reveal-section mb-8">
         <p className="section-label">The Core Prototype</p>
@@ -348,9 +460,7 @@ function CompareContent() {
       <section className="reveal-section mb-8">
         <PersonaInsightsPanel
           persona={persona}
-          onPersonaChange={(nextPersona) => {
-            if (nextPersona) setPersona(nextPersona);
-          }}
+          onPersonaChange={handlePersonaChange}
         />
       </section>
 
@@ -397,6 +507,11 @@ function CompareContent() {
       )}
 
       {data && !loading && (
+        <div style={{
+          opacity: transitioning ? 0.45 : 1,
+          transition: "opacity 0.25s ease",
+          pointerEvents: transitioning ? "none" : undefined,
+        }}>
         <>
           {/* ── Three-column route maps ── */}
           <section className="reveal-section mb-10">
@@ -501,7 +616,9 @@ function CompareContent() {
             A faster route is not always a lighter journey.
           </p>
         </>
+        </div>
       )}
+      </div>
     </div>
   );
 }

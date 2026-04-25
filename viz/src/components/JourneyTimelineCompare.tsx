@@ -323,7 +323,6 @@ export default function JourneyTimelineCompare({
     ...rows.filter((r) => !r.unavailable).map((r) => r.totalMin),
     1,
   );
-  const anyRisk = rows.some((r) => r.hasRisk && !r.unavailable);
 
   return (
     <div className="jtc-panel">
@@ -335,38 +334,6 @@ export default function JourneyTimelineCompare({
           journey plan.
         </p>
       </div>
-
-      {anyRisk && (
-        <div className="jtc-risk-tooltip" role="note">
-          <div className="jtc-risk-tooltip-title">
-            <Zap size={13} />
-            <span>Transfer Risk</span>
-          </div>
-          <p className="jtc-risk-tooltip-lead">
-            What if you miss this connection?
-          </p>
-          <ul className="jtc-risk-tooltip-list">
-            <li>
-              <span>Next service</span>
-              <strong className="jtc-risk-value">
-                {longestRiskWait(rows)} min
-              </strong>
-            </li>
-            <li>
-              <span>Backup</span>
-              <strong className="jtc-risk-value jtc-risk-value--warn">
-                None
-              </strong>
-            </li>
-            <li>
-              <span>Support nearby</span>
-              <strong className="jtc-risk-value jtc-risk-value--warn">
-                Closed
-              </strong>
-            </li>
-          </ul>
-        </div>
-      )}
 
       <div className="jtc-rows">
         {rows.map((row) => (
@@ -458,18 +425,4 @@ export default function JourneyTimelineCompare({
       </div>
     </div>
   );
-}
-
-function longestRiskWait(rows: TimelineRow[]): number {
-  let worst = 0;
-  for (const r of rows) {
-    for (const s of r.segments) {
-      if (s.risk && s.kind === "wait" && s.headwayMin != null) {
-        worst = Math.max(worst, s.headwayMin);
-      } else if (s.risk && s.kind === "wait") {
-        worst = Math.max(worst, Math.round(s.durationMin * 2));
-      }
-    }
-  }
-  return worst || 20;
 }

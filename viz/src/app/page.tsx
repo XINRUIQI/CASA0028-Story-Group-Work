@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import HeroCover from "@/components/HeroCover";
+import VitalityTimeline from "@/components/VitalityTimeline";
 import type { ContextTag } from "@/lib/types";
 
 /* ── Page 1: Context checkboxes ──────────────────────────────── */
@@ -153,6 +154,9 @@ export default function LandingPage() {
     <>
       {/* ═══════════════ Page 0: Cinematic cover ═══════════════ */}
       <HeroCover />
+
+      {/* ═══════════════ Page 0.5: City Vitality Timeline ═══════ */}
+      <VitalityTimeline />
 
       {/* ═══════════════ Page 1: Context selection ═══════════════ */}
       <section className="ctx-page">
