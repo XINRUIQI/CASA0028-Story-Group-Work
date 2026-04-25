@@ -273,13 +273,13 @@ export default function FairnessPanel() {
         const props = e.features?.[0]?.properties;
         if (props) {
           const drop = (props.drop_ratio * 100).toFixed(0);
-          const night = Number(props.night_value).toFixed(1);
-          const day = Number(props.day_value).toFixed(1);
+          const value = (Number(props.night_value) * 100).toFixed(0);
+          const reference = (Number(props.day_value) * 100).toFixed(0);
           popup
             .setLngLat(e.lngLat)
             .setHTML(
               `<strong>${props.name}</strong><br/>` +
-              `Gap: ${drop}% &middot; Day: ${day} &middot; Night: ${night}`
+              `Score: ${drop}% &middot; Reference: ${reference}% &middot; Value: ${value}%`
             )
             .addTo(m);
         }
@@ -542,19 +542,22 @@ function SmallMultipleChart({
   const H = 180;
   const PAD = { top: 35, right: 20, bottom: 30, left: 40 };
 
+  const yForScore = (score: number) =>
+    PAD.top + (1 - Math.min(Math.abs(score), 1)) * (H - PAD.top - PAD.bottom);
+
   const innerPts = innerZones.slice(0, 8).map(([, z], i) => ({
     x: PAD.left + ((W - PAD.left - PAD.right) * (i + 1)) / 9,
-    y: PAD.top + (1 - Math.abs(z.drop_ratio) / 0.8) * (H - PAD.top - PAD.bottom),
+    y: yForScore(z.drop_ratio),
   }));
   const outerPts = outerZones.slice(0, 8).map(([, z], i) => ({
     x: PAD.left + ((W - PAD.left - PAD.right) * (i + 1)) / 9,
-    y: PAD.top + (1 - Math.abs(z.drop_ratio) / 0.8) * (H - PAD.top - PAD.bottom),
+    y: yForScore(z.drop_ratio),
   }));
 
   const makePath = (pts: { x: number; y: number }[]) =>
     pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
 
-  const yTicks = [0, 20, 40, 60, 80];
+  const yTicks = [0, 25, 50, 75, 100];
 
   return (
     <div className="fairness-sm-card">
@@ -569,7 +572,7 @@ function SmallMultipleChart({
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="fairness-sm-svg">
         {yTicks.map((v) => {
-          const y = PAD.top + (1 - v / 80) * (H - PAD.top - PAD.bottom);
+          const y = PAD.top + (1 - v / 100) * (H - PAD.top - PAD.bottom);
           return (
             <g key={v}>
               <line x1={PAD.left} y1={y} x2={W - PAD.right} y2={y} stroke="rgba(200,200,220,0.1)" />
