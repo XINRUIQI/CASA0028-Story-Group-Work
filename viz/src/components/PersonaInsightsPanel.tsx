@@ -416,10 +416,7 @@ export default function PersonaInsightsPanel({
   const [allCurves, setAllCurves] = useState<AllCurves | null>(_curveCache);
 
   useEffect(() => {
-    if (_curveCache) {
-      setAllCurves(_curveCache);
-      return;
-    }
+    if (_curveCache) return;
     let stale = false;
     loadAllCurves().then((data) => {
       if (!stale) setAllCurves(data);
