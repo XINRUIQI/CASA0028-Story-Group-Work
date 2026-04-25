@@ -12,7 +12,9 @@ import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { api, type FairnessZone } from "@/lib/api";
 
-const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
+const MAPBOX_TOKEN =
+  process.env.NEXT_PUBLIC_MAPBOX_TOKEN ||
+  "pk.eyJ1IjoibGV2aW5lbGl1IiwiYSI6ImNta21vc3doOTBleGYza3IycDNsOXRidXQifQ.SdtOnvfZEml6QGLmnnduDQ";
 const CENTER: [number, number] = [-0.118, 51.509];
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const GEOJSON_URL = `${BASE_PATH}/london-boroughs.geojson`;
@@ -36,43 +38,43 @@ interface LayerDef {
 const LAYERS: LayerDef[] = [
   {
     id: "waiting_burden_increase",
-    label: "Waiting burden increase",
+    label: "Waiting burden diff",
     icon: <Timer size={14} />,
     accent: "var(--accent-rose)",
-    unit: "min headway",
-    description: "How much longer passengers wait at night compared to daytime.",
+    unit: "wait proxy",
+    description: "Borough-level night supply thinning used as a proxy for extra waiting burden.",
   },
   {
     id: "support_access_loss",
-    label: "Support access loss",
+    label: "Support access diff",
     icon: <ShieldCheck size={14} />,
     accent: "var(--accent-emerald)",
-    unit: "open POIs",
-    description: "How many support facilities close after dark in each area.",
+    unit: "access gap",
+    description: "MSOA-level gap between full support access and observed late-night support intensity.",
   },
   {
     id: "recovery_difficulty_increase",
     label: "Recovery difficulty",
     icon: <Route size={14} />,
     accent: "var(--champagne-gold)",
-    unit: "fallback routes",
-    description: "How much harder it becomes to recover from a missed connection.",
+    unit: "difficulty",
+    description: "Higher where night activity remains visible but nearby support capacity is weak.",
   },
   {
     id: "activity_decline",
     label: "Activity decline",
     icon: <Activity size={14} />,
     accent: "var(--accent-amber)",
-    unit: "activity ratio",
-    description: "How much the 'someone is around' presence fades at night.",
+    unit: "activity gap",
+    description: "MSOA-level gap between full activity footprint and observed late-night activity.",
   },
   {
     id: "low_light_walking_burden",
-    label: "Low-light walking burden",
+    label: "Low-support walking exposure",
     icon: <Lightbulb size={14} />,
     accent: "var(--champagne-gold)",
-    unit: "lit share",
-    description: "Night walking burden in areas with less lighting infrastructure.",
+    unit: "exposure proxy",
+    description: "Composite proxy from borough visibility context and MSOA support weakness.",
   },
 ];
 
@@ -82,8 +84,9 @@ const INNER_BOROUGHS = new Set([
   "Southwark", "Tower Hamlets", "Wandsworth", "Westminster",
 ]);
 
-function dropColor(ratio: number): string {
-  const t = Math.min(Math.max(Math.abs(ratio), 0), 0.8) / 0.8;
+function dropColor(ratio: number, min = 0, max = 0.8): string {
+  const span = Math.max(max - min, 0.001);
+  const t = Math.min(Math.max((Math.abs(ratio) - min) / span, 0), 1);
   const r = Math.round(50 + t * 151);
   const g = Math.round(48 + t * 121);
   const b = Math.round(60 + t * 50);
@@ -129,6 +132,9 @@ function mergeGeoWithZones(
       night: list.reduce((s, z) => s + z.night_value, 0) / n,
     };
   }
+  const drops = Object.values(boroughAgg).map((agg) => Math.abs(agg.drop));
+  const minDrop = Math.min(...drops, 0);
+  const maxDrop = Math.max(...drops, 0.001);
 
   return {
     type: "FeatureCollection",
@@ -142,7 +148,7 @@ function mergeGeoWithZones(
           drop_ratio: agg ? Math.abs(agg.drop) : 0,
           day_value: agg ? agg.day : 0,
           night_value: agg ? agg.night : 0,
-          fill_color: agg ? dropColor(agg.drop) : "rgba(40,50,90,0.5)",
+          fill_color: agg ? dropColor(agg.drop, minDrop, maxDrop) : "rgba(40,50,90,0.5)",
         },
       };
     }),
@@ -324,6 +330,10 @@ export default function FairnessPanel() {
   const sortedZones = aggregatedZones.sort(
     ([, a], [, b]) => Math.abs(b.drop_ratio) - Math.abs(a.drop_ratio),
   );
+  const maxZoneDrop = Math.max(
+    ...sortedZones.map(([, z]) => Math.abs(z.drop_ratio)),
+    0.001,
+  );
   const innerZones = sortedZones.filter(([, z]) => INNER_BOROUGHS.has(z.name));
   const outerZones = sortedZones.filter(([, z]) => !INNER_BOROUGHS.has(z.name));
 
@@ -389,7 +399,7 @@ export default function FairnessPanel() {
 
           <div className="fairness-legend">
             <span className="fairness-legend-title">
-              Day-to-Night Gap [0% &rarr; 80%]
+              Layer intensity [low &rarr; high]
             </span>
             <div className="fairness-legend-bar" />
             <div className="fairness-legend-labels">
@@ -418,13 +428,13 @@ export default function FairnessPanel() {
       {!loading && sortedZones.length > 0 && (
         <div className="fairness-sm-row">
           <SmallMultipleChart
-            title="Small Multiples: Inner vs Outer Support Drop"
+            title="Small Multiples: Inner vs Outer Layer Gap"
             innerZones={innerZones}
             outerZones={outerZones}
             legendLabels={["Inner London", "Peripheral London"]}
           />
           <SmallMultipleChart
-            title="Small Multiples: Region-Type Support Drop"
+            title="Small Multiples: Region-Type Layer Gap"
             innerZones={innerZones}
             outerZones={outerZones}
             legendLabels={["Region-type-specific", "Region performance"]}
@@ -441,11 +451,11 @@ export default function FairnessPanel() {
           </div>
 
           <div className="fairness-rank">
-            <h4 className="fairness-rank-title">Day-to-night change by area</h4>
+            <h4 className="fairness-rank-title">Layer intensity by area</h4>
             <div className="fairness-bars">
               {sortedZones.slice(0, 15).map(([code, zone]) => {
                 const abs = Math.abs(zone.drop_ratio);
-                const barWidth = Math.min(abs * 100, 100);
+                const barWidth = Math.min((abs / maxZoneDrop) * 100, 100);
                 const dl = dropLabel(zone.drop_ratio);
                 return (
                   <div key={code} className="fairness-bar-row">
@@ -492,12 +502,12 @@ function ZoneGroup({
       <div className="fairness-group-stats">
         <div className="fairness-group-stat">
           <span className="fairness-group-val">{avgDay.toFixed(1)}</span>
-          <span className="fairness-group-lbl">Day baseline</span>
+          <span className="fairness-group-lbl">Reference</span>
         </div>
         <span className="fairness-group-arrow">&rarr;</span>
         <div className="fairness-group-stat">
           <span className="fairness-group-val">{avgNight.toFixed(1)}</span>
-          <span className="fairness-group-lbl">Night value</span>
+          <span className="fairness-group-lbl">Layer value</span>
         </div>
         <div className="fairness-group-stat">
           <span className="fairness-group-val" style={{ color: dl.color }}>
@@ -573,7 +583,7 @@ function SmallMultipleChart({
         <text x={W / 2} y={H - 8} fill="#6b7194" fontSize="9" textAnchor="middle">Area</text>
         <text x={W - PAD.right - 30} y={H - 8} fill="#6b7194" fontSize="9" textAnchor="middle">Outer</text>
         <text x={12} y={H / 2} fill="#6b7194" fontSize="9" textAnchor="middle" transform={`rotate(-90,12,${H / 2})`}>
-          Support Drop
+          Layer Gap
         </text>
         {innerPts.length > 1 && (
           <path d={makePath(innerPts)} fill="none" stroke="#d4946a" strokeWidth="2" opacity="0.85" />

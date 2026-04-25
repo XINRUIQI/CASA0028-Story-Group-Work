@@ -35,6 +35,9 @@ interface WaitingBurdenCard {
   max_single_wait_min?: number;
   wait_segments?: number;
 }
+interface FunctionalCostCard {
+  fare?: number | null;
+}
 interface SupportAccessCard {
   total_support_open?: number;
   total_support_all?: number;
@@ -44,6 +47,9 @@ interface ServiceUncertaintyCard {
   uncertainty_score_pct?: number;
   uncertainty_label?: string;
   mean_headway_gap_ratio?: number | null;
+  fallback_lines_total?: number | null;
+  mean_alternative_routes?: number | null;
+  transfer_count?: number | null;
 }
 interface ActivityContextCard {
   route_activity_index?: number;
@@ -59,6 +65,16 @@ interface SafetyExposureCard {
 function formatNum(v: unknown, digits = 0): string {
   if (typeof v !== "number" || !Number.isFinite(v)) return "—";
   return v.toFixed(digits);
+}
+
+function asFiniteNumber(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function formatFarePence(value: number): string {
+  return `£${(value / 100).toFixed(2)}`;
 }
 
 function titleCase(s?: string | null): string {
@@ -102,6 +118,100 @@ function toneByResilience(label?: string): "good" | "warn" | "bad" {
   return "bad";
 }
 
+function toneByRecoveryMinutes(minutes?: number | null): "good" | "warn" | "bad" {
+  if (minutes == null) return "warn";
+  if (minutes >= 15) return "bad";
+  if (minutes >= 8) return "warn";
+  return "good";
+}
+
+function estimateFarePence(
+  journey: Journey,
+  origin?: string,
+  destination?: string,
+): { value: string; sub?: string } {
+  const transitModes = journey.legs
+    .filter((leg) => !leg.is_walking)
+    .map((leg) => leg.mode_id);
+
+  if (transitModes.length > 0 && transitModes.every((mode) => mode === "bus")) {
+    return { value: `${formatFarePence(175)} est.`, sub: "Flat bus fare estimate" };
+  }
+
+  if (origin === "940GZZLUSTD" && destination === "940GZZLUBXN") {
+    return { value: `${formatFarePence(310)} est.`, sub: "TfL PAYG off-peak fallback" };
+  }
+
+  return { value: "Not returned", sub: "TfL fare unavailable" };
+}
+
+function buildFareDisplay(
+  journey: Journey,
+  functionalCost: FunctionalCostCard,
+  origin?: string,
+  destination?: string,
+): { value: string; sub?: string } {
+  const fare = asFiniteNumber(journey.fare) ?? asFiniteNumber(functionalCost.fare);
+  if (fare != null) return { value: formatFarePence(fare) };
+  return estimateFarePence(journey, origin, destination);
+}
+
+function buildRecoveryDisplay(
+  journey: Journey,
+  waitingBurden: WaitingBurdenCard,
+  serviceUncertainty: ServiceUncertaintyCard,
+  recovery?: JourneyRecoveryResult | null,
+): { value: string; sub?: string; tone: "good" | "warn" | "bad" } {
+  if (recovery?.mean_penalty_min != null) {
+    return {
+      value: `${formatNum(recovery.mean_penalty_min, 1)} min avg`,
+      sub: recovery.overall_resilience
+        ? `Resilience: ${titleCase(recovery.overall_resilience)}`
+        : undefined,
+      tone: toneByResilience(recovery.overall_resilience),
+    };
+  }
+
+  if (recovery?.overall_resilience === "no transfers" || journey.transfers === 0) {
+    return {
+      value: "No transfers",
+      sub: "No interchange recovery needed",
+      tone: "good",
+    };
+  }
+
+  const maxSingleWait = asFiniteNumber(waitingBurden.max_single_wait_min);
+  const totalWait = asFiniteNumber(waitingBurden.total_expected_wait_min);
+  const waitSegments = Math.max(1, asFiniteNumber(waitingBurden.wait_segments) ?? 1);
+  const fallbackLines = asFiniteNumber(serviceUncertainty.fallback_lines_total);
+  const alternatives = asFiniteNumber(serviceUncertainty.mean_alternative_routes);
+  const transferCount = asFiniteNumber(serviceUncertainty.transfer_count) ?? journey.transfers;
+  const expectedSingleWait = maxSingleWait ?? (totalWait != null ? totalWait / waitSegments : null);
+
+  if (expectedSingleWait == null) {
+    return {
+      value: "Not returned",
+      sub: "Recovery API unavailable",
+      tone: "warn",
+    };
+  }
+
+  let estimate = expectedSingleWait * 2;
+  if (fallbackLines != null && fallbackLines <= 0) estimate *= 1.25;
+  else if (alternatives != null && alternatives >= 10) estimate *= 0.9;
+  estimate += Math.max(0, transferCount - 1);
+
+  const rounded = Math.max(1, Math.round(estimate));
+  return {
+    value: `~${rounded} min est.`,
+    sub:
+      fallbackLines != null
+        ? `Fallback lines: ${fallbackLines}`
+        : "Estimated from headway",
+    tone: toneByRecoveryMinutes(rounded),
+  };
+}
+
 /* ── Component ─────────────────────────────────────────────── */
 
 export default function OptionCard({
@@ -127,11 +237,14 @@ export default function OptionCard({
     );
   }
 
+  const fc = (cards?.functional_cost ?? {}) as FunctionalCostCard & CardData;
   const wb = (cards?.waiting_burden ?? {}) as WaitingBurdenCard & CardData;
   const sa = (cards?.support_access ?? {}) as SupportAccessCard & CardData;
   const su = (cards?.service_uncertainty ?? {}) as ServiceUncertaintyCard & CardData;
   const ac = (cards?.activity_context ?? {}) as ActivityContextCard & CardData;
   const se = (cards?.safety_exposure ?? {}) as SafetyExposureCard & CardData;
+  const fareDisplay = buildFareDisplay(journey, fc, origin, destination);
+  const recoveryDisplay = buildRecoveryDisplay(journey, wb, su, recovery);
 
   const metrics = [
     {
@@ -146,7 +259,8 @@ export default function OptionCard({
       key: "fare",
       icon: <Coins size={14} />,
       label: "Fare",
-      value: journey.fare != null ? `£${(journey.fare / 100).toFixed(2)}` : "—",
+      value: fareDisplay.value,
+      sub: fareDisplay.sub,
       tone: "warn" as const,
       source: "functional_cost",
     },
@@ -232,17 +346,9 @@ export default function OptionCard({
       key: "recovery",
       icon: <LifeBuoy size={14} />,
       label: "Recovery time",
-      value:
-        recovery?.mean_penalty_min != null
-          ? `${formatNum(recovery.mean_penalty_min, 1)} min avg`
-          : recovery?.overall_resilience === "no transfers"
-            ? "No transfers"
-            : "—",
-      sub:
-        recovery?.overall_resilience
-          ? `Resilience: ${titleCase(recovery.overall_resilience)}`
-          : undefined,
-      tone: toneByResilience(recovery?.overall_resilience),
+      value: recoveryDisplay.value,
+      sub: recoveryDisplay.sub,
+      tone: recoveryDisplay.tone,
       source: "journey_recovery",
     },
     {
