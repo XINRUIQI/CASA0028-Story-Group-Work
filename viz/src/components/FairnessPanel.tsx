@@ -7,6 +7,8 @@ import {
   Route,
   Activity,
   Lightbulb,
+  Info,
+  ChevronDown,
 } from "lucide-react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
@@ -50,7 +52,7 @@ const LAYERS: LayerDef[] = [
     icon: <ShieldCheck size={14} />,
     accent: "var(--accent-emerald)",
     unit: "access gap",
-    description: "MSOA-level gap between full support access and observed late-night support intensity.",
+    description: "Borough-level mismatch between night activity need and nearby support availability.",
   },
   {
     id: "recovery_difficulty_increase",
@@ -66,7 +68,7 @@ const LAYERS: LayerDef[] = [
     icon: <Activity size={14} />,
     accent: "var(--accent-amber)",
     unit: "activity gap",
-    description: "MSOA-level gap between full activity footprint and observed late-night activity.",
+    description: "Borough-level relative decline in night-time activity and service footprint.",
   },
   {
     id: "low_light_walking_burden",
@@ -75,6 +77,50 @@ const LAYERS: LayerDef[] = [
     accent: "var(--champagne-gold)",
     unit: "exposure proxy",
     description: "Composite proxy from borough visibility context and MSOA support weakness.",
+  },
+];
+
+const SCORE_GUIDE: Array<{
+  id: LayerId;
+  title: string;
+  score: string;
+  reference: string;
+  value: string;
+}> = [
+  {
+    id: "waiting_burden_increase",
+    title: "Waiting burden diff",
+    score: "Percentile rank of relative decline in waiting-support places such as pubs, licensed food, takeaway and small pubs.",
+    reference: "Normalised 2001 borough presence for those waiting-support categories.",
+    value: "Normalised 2017 borough presence for the same categories.",
+  },
+  {
+    id: "support_access_loss",
+    title: "Support access diff",
+    score: "Percentile rank of max(0, activity need rank - support availability rank).",
+    reference: "Borough night activity need rank from NTE, pubs, nightlife, nightclub and cultural POI counts.",
+    value: "Borough support availability rank from licensed food, clubs, grassroots music, LGBT venues and nightlife POIs.",
+  },
+  {
+    id: "recovery_difficulty_increase",
+    title: "Recovery difficulty",
+    score: "Percentile rank of a composite recovery difficulty score.",
+    reference: "Inverse of the composite difficulty score, used as a low-difficulty reference.",
+    value: "Composite of support access diff, waiting burden diff and night activity need.",
+  },
+  {
+    id: "activity_decline",
+    title: "Activity decline",
+    score: "Percentile rank of relative decline in night-time economy and activity categories.",
+    reference: "Normalised 2001 borough activity footprint.",
+    value: "Normalised 2017 borough activity footprint.",
+  },
+  {
+    id: "low_light_walking_burden",
+    title: "Low-support walking exposure",
+    score: "Composite proxy combining borough visibility context with weak late-night support.",
+    reference: "Relative low-exposure reference for the composite proxy.",
+    value: "Relative exposure value from visibility and support weakness inputs.",
   },
 ];
 
@@ -161,6 +207,7 @@ const EMPTY_FC: GeoJSON.FeatureCollection = { type: "FeatureCollection", feature
 
 export default function FairnessPanel() {
   const [activeLayer, setActiveLayer] = useState<LayerId>("support_access_loss");
+  const [showScoreGuide, setShowScoreGuide] = useState(false);
   const [zones, setZones] = useState<Record<string, FairnessZone>>({});
   const [fetchedLayer, setFetchedLayer] = useState<string>("");
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -336,6 +383,8 @@ export default function FairnessPanel() {
   );
   const innerZones = sortedZones.filter(([, z]) => INNER_BOROUGHS.has(z.name));
   const outerZones = sortedZones.filter(([, z]) => !INNER_BOROUGHS.has(z.name));
+  const activeLayerDef = LAYERS.find((l) => l.id === activeLayer);
+  const activeGuide = SCORE_GUIDE.find((item) => item.id === activeLayer);
 
   return (
     <div className="fairness-page-wrap">
@@ -386,6 +435,45 @@ export default function FairnessPanel() {
               </label>
             );
           })}
+
+          <div className="fairness-score-guide">
+            <button
+              type="button"
+              className={`fairness-score-guide-toggle ${showScoreGuide ? "active" : ""}`}
+              onClick={() => setShowScoreGuide((open) => !open)}
+              aria-expanded={showScoreGuide}
+              style={showScoreGuide && activeLayerDef ? {
+                borderColor: activeLayerDef.accent,
+                color: activeLayerDef.accent,
+              } : undefined}
+            >
+              <span
+                className="fairness-score-guide-dot"
+                style={{
+                  borderColor: showScoreGuide && activeLayerDef ? activeLayerDef.accent : "var(--text-muted)",
+                  background: showScoreGuide && activeLayerDef ? activeLayerDef.accent : "transparent",
+                }}
+              >
+                <Info size={10} />
+              </span>
+              <span>Score guide: {activeLayerDef?.label || "Current map"}</span>
+              <ChevronDown
+                size={14}
+                className={showScoreGuide ? "fairness-score-guide-chevron open" : "fairness-score-guide-chevron"}
+              />
+            </button>
+
+            {showScoreGuide && activeGuide && (
+              <div key={activeLayer} className="fairness-score-guide-panel">
+                <section className="fairness-score-guide-item">
+                  <h3>{activeGuide.title}</h3>
+                  <p><strong>Score</strong>: {activeGuide.score}</p>
+                  <p><strong>Reference</strong>: {activeGuide.reference}</p>
+                  <p><strong>Value</strong>: {activeGuide.value}</p>
+                </section>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="fairness-map-area">
