@@ -1,7 +1,95 @@
 "use client";
 
 import Link from "next/link";
-import { Lightbulb, AlertTriangle, ListChecks, AlertCircle, Clock } from "lucide-react";
+import {
+  Lightbulb,
+  AlertTriangle,
+  ListChecks,
+  AlertCircle,
+  Clock,
+  Moon,
+  Users,
+  Scale,
+} from "lucide-react";
+
+/**
+ * "Echo" reflection — connects this prototype's findings to broader
+ * social issues (gendered fear, gig-economy hours, support gaps).
+ *
+ * The numeric claims here are kept conservative: Night Tube coverage
+ * is independently verifiable from TfL; references to gendered/disabled
+ * traveller experience are described qualitatively and pointed to source
+ * reports rather than reproduced as specific percentages we cannot
+ * stand behind without citation.
+ */
+const ECHO_BLOCKS: {
+  title: string;
+  body: React.ReactNode;
+  icon: React.ReactNode;
+  accent: string;
+}[] = [
+  {
+    title: "The night-time city is not the same city",
+    icon: <Moon size={18} />,
+    accent: "var(--champagne-gold)",
+    body: (
+      <>
+        Services thin out, public spaces empty, and hidden burdens fall
+        hardest on the people who travel anyway — shift workers, carers,
+        students, people without other options. On Fridays and Saturdays
+        only <strong>5 of 11</strong> London Underground lines run through
+        the night. Every other night, almost the entire network closes.
+        The fact that a route appears on a map is not the same as the
+        route being reachable, frequent, or supported.
+      </>
+    ),
+  },
+  {
+    title: "Who travels after dark is not random",
+    icon: <Users size={18} />,
+    accent: "var(--accent-rose)",
+    body: (
+      <>
+        Surveys of women, disabled and minority-ethnic passengers show
+        again and again that night-time public transport is not simply an
+        inconvenience — it is a constant calculation about which routes
+        feel possible at all.
+        <sup className="refl-echo-ref">[1]</sup> Those calculations rarely
+        make it into the data planners use. The journeys most likely to be
+        silently re-routed, postponed, or never taken are also the ones
+        that show up the least in headline statistics.
+      </>
+    ),
+  },
+  {
+    title: "Hidden burdens are political",
+    icon: <Scale size={18} />,
+    accent: "var(--accent-emerald)",
+    body: (
+      <>
+        Wait time is not fear. Support availability is not safety. This
+        prototype does not measure either directly. What it can do is make
+        the invisible parts of a journey legible — so routes are no longer
+        silently judged on speed alone, and so that the trade-offs
+        travellers already make in their heads are at least visible to the
+        systems planning around them.
+      </>
+    ),
+  },
+];
+
+const ECHO_REFERENCES: { id: string; label: string; url?: string }[] = [
+  {
+    id: "1",
+    label: "Transport for All — Pave the Way (2023)",
+    url: "https://www.transportforall.org.uk/campaigns/pave-the-way/",
+  },
+  {
+    id: "1",
+    label: "TfL Women's Safety on Transport survey series",
+    url: "https://tfl.gov.uk/info-for/media/press-releases",
+  },
+];
 
 const CARDS = [
   {
@@ -83,7 +171,55 @@ export default function ReflectionPage() {
       {/* Title */}
       <div className="refl-header">
         <h1 className="refl-title">Reflection &amp; Limits</h1>
+        <blockquote className="story-pull-quote story-pull-quote--center">
+          We did not set out to declare a route safe.
+          <br />
+          We set out to make hidden burdens visible.
+        </blockquote>
       </div>
+
+      {/* Echo: connect findings to broader social issues */}
+      <section className="refl-echo">
+        <p className="refl-echo-kicker">Why this matters</p>
+        <div className="refl-echo-grid">
+          {ECHO_BLOCKS.map((b) => (
+            <article key={b.title} className="refl-echo-block">
+              <header
+                className="refl-echo-head"
+                style={{ color: b.accent, borderBottomColor: b.accent }}
+              >
+                <span className="refl-echo-icon">{b.icon}</span>
+                <h3 className="refl-echo-title">{b.title}</h3>
+              </header>
+              <p className="refl-echo-body">{b.body}</p>
+            </article>
+          ))}
+        </div>
+        <ol className="refl-echo-refs">
+          {ECHO_REFERENCES.map((r, i) => (
+            <li key={`${r.id}-${i}`}>
+              <span className="refl-echo-ref-num">[{r.id}]</span>{" "}
+              {r.url ? (
+                <a
+                  href={r.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="refl-echo-ref-link"
+                >
+                  {r.label}
+                </a>
+              ) : (
+                <span>{r.label}</span>
+              )}
+            </li>
+          ))}
+        </ol>
+        <p className="refl-echo-bridge">
+          What follows is the methodology behind that attempt — what the
+          tool helps with, what it cannot know, and where it might still
+          mislead.
+        </p>
+      </section>
 
       {/* 2×2 card grid */}
       <div className="refl-grid">

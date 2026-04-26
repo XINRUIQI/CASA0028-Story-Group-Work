@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo, useTransition, Suspe
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import JourneyTimelineCompare from "@/components/JourneyTimelineCompare";
+import JourneyNarrative from "@/components/JourneyNarrative";
 import OptionCard from "@/components/OptionCard";
 import RouteMap from "@/components/RouteMap";
 import Mechanisms from "@/components/Mechanisms";
@@ -507,6 +508,11 @@ function CompareContent() {
         <h1 className="text-3xl font-bold mb-3">
           Compare Journeys Across Time
         </h1>
+
+        <blockquote className="story-pull-quote">
+          The route stays the same. The city around it does not.
+        </blockquote>
+
         <p className="mb-3" style={{ color: "var(--text-secondary)" }}>
           A journey is not only about where you go, but when you leave.
         </p>
@@ -515,6 +521,16 @@ function CompareContent() {
           support, reliability, backup options, and route exposure — helping
           travellers understand the trade-offs before they set off.
         </p>
+      </section>
+
+      {/* ── Narrative overlay: anchor the comparison in a protagonist ── */}
+      <section className="reveal-section mb-8">
+        <JourneyNarrative
+          persona={persona}
+          originName={originName}
+          destinationName={destinationName}
+          contexts={contexts}
+        />
       </section>
 
       {/* ── Persona insights + journey context + custom route ── */}

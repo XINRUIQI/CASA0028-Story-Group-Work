@@ -111,7 +111,45 @@ export default function HeroCover() {
             </span>
           </h1>
 
-          <p className="hero-description">
+          <p className="hero-thesis">
+            Same trip. Different city.
+          </p>
+
+          {/* Big-number opener: framing the day/night gap with three stats
+              taken from our own City Vitality index (lib/vitality.ts) plus
+              one externally verifiable Tube fact. */}
+          <div className="hero-stats" aria-label="Day versus night summary">
+            <div className="hero-stat">
+              <span className="hero-stat-num">
+                91<span className="hero-stat-sep">→</span>35
+                <span className="hero-stat-unit">%</span>
+              </span>
+              <span className="hero-stat-label">
+                City Vitality, day to 01:00
+              </span>
+            </div>
+            <div className="hero-stat-divider" aria-hidden />
+            <div className="hero-stat">
+              <span className="hero-stat-num">
+                97<span className="hero-stat-sep">→</span>22
+                <span className="hero-stat-unit">%</span>
+              </span>
+              <span className="hero-stat-label">
+                Support access, day to 01:00
+              </span>
+            </div>
+            <div className="hero-stat-divider" aria-hidden />
+            <div className="hero-stat">
+              <span className="hero-stat-num">
+                5<span className="hero-stat-sep">/</span>11
+              </span>
+              <span className="hero-stat-label">
+                Tube lines run all night
+              </span>
+            </div>
+          </div>
+
+          <p className="hero-description hero-description--sub">
             A simple comparison of how travel changes
             <br />
             between daylight and after dark.
