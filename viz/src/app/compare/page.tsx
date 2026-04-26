@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useTransition, Suspense } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, useTransition, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import JourneyTimelineCompare from "@/components/JourneyTimelineCompare";
@@ -11,9 +11,11 @@ import {
   PERSONA_DEFS,
   PERSONA_ROUTES,
   type PersonaId,
+  type PresetPersonaId,
 } from "@/components/PersonaSwitch";
-import PersonaInsightsPanel from "@/components/PersonaInsightsPanel";
+import PersonaInsightsPanel, { type HourlyPoint } from "@/components/PersonaInsightsPanel";
 import CustomRouteSelector from "@/components/CustomRouteSelector";
+import WhatWeCompare from "@/components/WhatWeCompare";
 import { useReveal } from "@/lib/useReveal";
 import { type ContextTag, CONTEXT_LABELS } from "@/lib/types";
 import {
@@ -25,14 +27,26 @@ import {
 } from "@/lib/api";
 
 const TIME_LABELS: Record<string, string> = {
-  "14:00": "Daytime",
-  "19:00": "Evening",
-  "00:00": "Late Night",
-  "18:00": "☀️ Daytime",
-  "21:00": "🌆 Evening",
-  "22:30": "🌙 Late Night",
-  "23:00": "🌙 Late Night",
+  "14:00": "Daytime · 14:00",
+  "19:00": "Evening · 19:00",
+  "00:00": "Late Night · 24:00",
+  "18:00": "☀️ Daytime · 18:00",
+  "21:00": "🌆 Evening · 21:00",
+  "22:30": "🌙 Late Night · 22:30",
+  "23:00": "🌙 Late Night · 23:00",
   "23:30": "🌙 Late Night",
+};
+
+/** Map labels: emoji separate from text so colour CSS does not wash out the icons */
+const ROUTE_MAP_TIME_PARTS: Record<string, { emoji: string; text: string }> = {
+  "14:00": { emoji: "☀️", text: "Daytime · 14:00" },
+  "19:00": { emoji: "🌆", text: "Evening · 19:00" },
+  "00:00": { emoji: "🌙", text: "Late Night · 24:00" },
+  "18:00": { emoji: "☀️", text: "Daytime · 18:00" },
+  "21:00": { emoji: "🌆", text: "Evening · 21:00" },
+  "22:30": { emoji: "🌙", text: "Late Night · 22:30" },
+  "23:00": { emoji: "🌙", text: "Late Night · 23:00" },
+  "23:30": { emoji: "🌙", text: "Late Night · 23:30" },
 };
 
 const TIME_COLORS = [
@@ -54,14 +68,12 @@ const PERSONA_FOCUS_TO_METRICS: Record<string, string[]> = {
 };
 
 const DENSE_COMPARE_FALLBACK_TIMES = [
+  "14:00",
+  "16:00",
   "18:00",
-  "19:00",
   "20:00",
-  "21:00",
   "22:00",
-  "23:00",
   "00:00",
-  "01:00",
   "02:00",
 ] as const;
 
@@ -173,7 +185,7 @@ function preloadOnePersona(
 const _defaultTimes = DEFAULT_COMPARE_TIMES.split(",");
 
 function startPreloadAll() {
-  for (const pid of Object.keys(PERSONA_ROUTES) as PersonaId[]) {
+  for (const pid of Object.keys(PERSONA_ROUTES) as PresetPersonaId[]) {
     const r = PERSONA_ROUTES[pid];
     preloadOnePersona(r.origin, r.dest, _defaultTimes);
   }
@@ -186,8 +198,8 @@ if (typeof window !== "undefined") {
 function getPresetPersona(
   origin?: string | null,
   destination?: string | null,
-): PersonaId | null {
-  for (const personaId of Object.keys(PERSONA_ROUTES) as PersonaId[]) {
+): PresetPersonaId | null {
+  for (const personaId of Object.keys(PERSONA_ROUTES) as PresetPersonaId[]) {
     const preset = PERSONA_ROUTES[personaId];
     if (preset.origin === origin && preset.dest === destination) {
       return personaId;
@@ -255,7 +267,9 @@ function CompareContent() {
     getPresetPersona(queryOrigin, queryDestination) ?? "student",
   );
 
-  const activeRoute = persona ? PERSONA_ROUTES[persona] : undefined;
+  const activeRoute = persona && persona !== "custom"
+    ? PERSONA_ROUTES[persona as PresetPersonaId]
+    : undefined;
   const origin = activeRoute?.origin ?? queryOrigin;
   const originName = activeRoute?.oName ?? queryOriginName;
   const destination = activeRoute?.dest ?? queryDestination;
@@ -263,6 +277,7 @@ function CompareContent() {
 
   const [data, setData] = useState<CompareResult | null>(null);
   const [cardsData, setCardsData] = useState<CompareCardsResult | null>(null);
+  const [denseCardsData, setDenseCardsData] = useState<CompareCardsResult | null>(null);
   const [recoveryByTime, setRecoveryByTime] = useState<
     Record<string, JourneyRecoveryResult | null>
   >({});
@@ -282,13 +297,13 @@ function CompareContent() {
 
   const handleCustomRoute = useCallback(
     (o: string, oName: string, d: string, dName: string) => {
-      setPersona(null);
+      setPersona("custom");
       const params = new URLSearchParams();
       params.set("origin", o);
       params.set("originName", oName);
       params.set("destination", d);
       params.set("destinationName", dName);
-      params.set("times", "18:00,21:00,23:30");
+      params.set("times", "14:00,19:00,00:00");
       router.push(`/compare?${params.toString()}`);
     },
     [router],
@@ -311,7 +326,7 @@ function CompareContent() {
 
   useEffect(() => {
     const matched = getPresetPersona(queryOrigin, queryDestination);
-    setPersona(matched);
+    setPersona(matched ?? "custom");
   }, [queryDestination, queryOrigin]);
 
   useEffect(() => {
@@ -393,6 +408,7 @@ function CompareContent() {
     ])
       .then(([staticCards, denseCards]) => {
         if (!isCurrentRequest()) return;
+        if (denseCards) setDenseCardsData(denseCards);
         const staticMerged = mergeCompareCards(times, staticCards, [denseCards]);
 
         if (staticMerged) {
@@ -456,63 +472,92 @@ function CompareContent() {
     }
   }
 
+  const customCurves = useMemo<Record<string, HourlyPoint | null> | null>(() => {
+    if (persona !== "custom") return null;
+    const sources = [denseCardsData, cardsData].filter(Boolean) as CompareCardsResult[];
+    if (sources.length === 0) return null;
+
+    const allTimes = [...DENSE_COMPARE_FALLBACK_TIMES, ...times];
+    const seen = new Set<string>();
+    const uniqueTimes = allTimes.filter((t) => { if (seen.has(t)) return false; seen.add(t); return true; });
+
+    const result: Record<string, HourlyPoint | null> = {};
+    for (const t of uniqueTimes) {
+      const opt = sources.find((s) => s.options[t]?.cards)?.options[t];
+      if (!opt?.cards) continue;
+      const wb = opt.cards.waiting_burden;
+      const sa = opt.cards.support_access;
+      const fc = opt.cards.functional_cost;
+      result[t] = {
+        duration_min: Number(fc?.total_duration_min ?? 0),
+        waiting_burden: Number(wb?.total_expected_wait_min ?? 0),
+        support_open: Number(sa?.total_support_open ?? 0),
+        recovery_penalty: Number(wb?.max_single_wait_min ?? 0),
+      };
+    }
+    return Object.values(result).some((v) => v !== null) ? result : null;
+  }, [persona, cardsData, denseCardsData, times]);
+
   return (
     <div className="compare-page">
       <div ref={revealRef} className="max-w-6xl mx-auto px-6 pt-20 pb-16">
       {/* ── Header ── */}
-      <section className="reveal-section mb-8">
-        <p className="section-label">The Core Prototype</p>
-        <h1 className="text-3xl font-bold mb-2">
-          Compare Options, Not Just Routes
+      <section className="reveal-section mb-12">
+        <h1 className="text-3xl font-bold mb-3">
+          Compare Journeys Across Time
         </h1>
-        <p style={{ color: "var(--text-secondary)" }}>
-          The same origin and destination can produce different burdens at
-          different times.
+        <p className="mb-3" style={{ color: "var(--text-secondary)" }}>
+          A journey is not only about where you go, but when you leave.
         </p>
-        <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-          These are not final recommendations. They are comparable trade-offs.
+        <p className="mb-2" style={{ color: "var(--text-secondary)" }}>
+          This prototype compares departure-time options through waiting,
+          support, reliability, backup options, and route exposure — helping
+          travellers understand the trade-offs before they set off.
         </p>
       </section>
 
-      {/* ── Persona insights (merged from choose page) ── */}
+      {/* ── Persona insights + journey context + custom route ── */}
       <section className="reveal-section mb-8">
         <PersonaInsightsPanel
           persona={persona}
           onPersonaChange={handlePersonaChange}
+          customCurves={customCurves}
+          headerContent={
+            persona === "custom" ? (
+              <div className="choose-journey-header choose-journey-header--custom">
+                <CustomRouteSelector
+                  currentOrigin={origin}
+                  currentDestination={destination}
+                  onSelect={handleCustomRoute}
+                />
+              </div>
+            ) : (
+              <div
+                className="choose-journey-header--preset"
+                style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "100%" }}
+              >
+                <h2 className="choose-journey-tonight">Your journey tonight</h2>
+                <p className="choose-journey-route">
+                  <span>{originName}</span>
+                  <span className="choose-journey-arrow">&rarr;</span>
+                  <span>{destinationName}</span>
+                </p>
+                {contexts.length > 0 && (
+                  <div className="flex items-center gap-2 flex-wrap mt-1">
+                    <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                      Viewing through:
+                    </span>
+                    {contexts.map((c) => (
+                      <span key={c} className="tag active text-xs">
+                        {CONTEXT_LABELS[c]}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          }
         />
-      </section>
-
-      {/* ── Custom route selector ── */}
-      <section className="reveal-section mb-8">
-        <CustomRouteSelector
-          currentOrigin={origin}
-          currentDestination={destination}
-          onSelect={handleCustomRoute}
-        />
-      </section>
-
-      {/* ── Journey context + Persona switch ── */}
-      <section className="reveal-section card mb-6">
-        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-          <h2 className="text-sm font-semibold">Your journey tonight</h2>
-        </div>
-        <p className="text-lg font-medium mb-3">
-          <span style={{ color: "var(--champagne-gold)" }}>{originName}</span>
-          {" → "}
-          <span style={{ color: "var(--champagne-gold)" }}>{destinationName}</span>
-        </p>
-        {contexts.length > 0 && (
-          <div className="flex items-center gap-2 flex-wrap mb-3">
-            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-              Viewing through:
-            </span>
-            {contexts.map((c) => (
-              <span key={c} className="tag active text-xs">
-                {CONTEXT_LABELS[c]}
-              </span>
-            ))}
-          </div>
-        )}
       </section>
 
       {/* ── Loading / error ── */}
@@ -542,26 +587,22 @@ function CompareContent() {
         <>
           {/* ── Three-column route maps ── */}
           <section className="reveal-section mb-10">
-            <h2 className="text-lg font-semibold mb-2">Route maps by departure time</h2>
-            <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>
-              The same route at different times. Support points thin out as
-              the night progresses.
+            <h2 className="choose-chart-title">What changes along the route?</h2>
+            <p className="compare-route-desc">
+              The route stays similar, but the support around it can change as the night gets later.
             </p>
             <div className="compare-maps-grid">
               {times.map((t, i) => {
                 const j = data.options[t];
                 if (!j) return null;
-                const supportCard = cardsData?.options[t]?.cards?.support_access;
-                const activityCard = cardsData?.options[t]?.cards?.activity_context;
-                const supportOpen = supportCard?.total_support_open;
+                const parts = ROUTE_MAP_TIME_PARTS[t];
                 return (
                   <RouteMap
                     key={t}
                     legs={j.legs}
-                    label={TIME_LABELS[t] || t}
+                    label={parts?.text ?? (TIME_LABELS[t] || t)}
+                    labelEmoji={parts?.emoji}
                     accent={TIME_COLORS[i % TIME_COLORS.length]}
-                    supportCount={supportOpen != null ? Number(supportOpen) : undefined}
-                    supportSummary={buildRouteSupportSummary(supportCard, activityCard)}
                     theme={mapThemeForTime(t)}
                   />
                 );
@@ -580,25 +621,37 @@ function CompareContent() {
             />
           </section>
 
-          {/* ── Option cards ── */}
+          {/* ── What we compare (metro-map indicator overview) ── */}
           <section className="reveal-section mb-10">
-            <h2 className="text-lg font-semibold mb-4">
-              Route options by departure time
-            </h2>
-            <div className="grid md:grid-cols-3 gap-4">
-              {times.map((time, i) => (
-                <OptionCard
-                  key={time}
-                  time={time}
-                  index={i}
-                  journey={data.options[time]}
-                  cards={cardsByTime[time]}
-                  recovery={recoveryByTime[time] ?? null}
-                  highlighted={highlightedMetrics}
-                  origin={origin}
-                  destination={destination}
-                />
-              ))}
+            <WhatWeCompare />
+          </section>
+
+          {/* ── Option cards (same panel + header pattern as Journey Timeline) ── */}
+          <section className="reveal-section mb-10">
+            <div className="jtc-panel">
+              <div className="jtc-header">
+                <h3 className="choose-chart-title">
+                  What each departure time means
+                </h3>
+                <p className="compare-route-desc compare-route-desc--jtc">
+                  Leaving later can change more than the route. These cards show how
+                  time, cost, walking, waiting, transfers, and support nearby shift
+                  across the day and night.
+                </p>
+              </div>
+              <div className="grid md:grid-cols-3 gap-4">
+                {times.map((time, i) => (
+                  <OptionCard
+                    key={time}
+                    time={time}
+                    index={i}
+                    journey={data.options[time]}
+                    cards={cardsByTime[time]}
+                    recovery={recoveryByTime[time] ?? null}
+                    highlighted={highlightedMetrics}
+                  />
+                ))}
+              </div>
             </div>
           </section>
 

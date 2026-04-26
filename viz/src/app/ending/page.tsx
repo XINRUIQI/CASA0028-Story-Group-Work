@@ -42,7 +42,7 @@ export default function EndingPage() {
           <div className="final-credit-divider" />
           <div className="final-credit-group">
             <span className="final-credit-label">Team</span>
-            <span className="final-credit-value">Xinrui Qi &middot; Shirly</span>
+            <span className="final-credit-value">Xinrui Qi &middot; Hongxi Liu &middot; Zhuohang Duan &middot; Dailing Wu</span>
           </div>
           <div className="final-credit-divider" />
           <div className="final-credit-group">
@@ -52,13 +52,6 @@ export default function EndingPage() {
         </div>
 
         <div className="final-credits">
-          <div className="final-credit-group">
-            <span className="final-credit-label">Data Sources</span>
-            <span className="final-credit-value">
-              TfL Unified API &middot; OpenStreetMap &middot; NHS APIs &middot; BHF The Circuit &middot; GLA London Datastore &middot; NASA Black Marble &middot; data.police.uk &middot; NaPTAN (DfT)
-            </span>
-          </div>
-          <div className="final-credit-divider" />
           <div className="final-credit-group">
             <span className="final-credit-label">Built With</span>
             <span className="final-credit-value">Next.js &middot; FastAPI &middot; Tailwind CSS &middot; Mapbox &middot; Lucide Icons</span>

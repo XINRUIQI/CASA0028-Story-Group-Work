@@ -37,27 +37,27 @@ const STATIC_STARS = generateStars();
 const INTRO_DIMENSIONS = [
   {
     icon: Clock,
-    title: "Waiting",
+    title: "Waiting time",
     description:
-      "How long you may wait, and what happens if you miss a connection.",
+      "How long you may wait, and how easy it is to continue if you miss a bus, train, or connection.",
   },
   {
     icon: ShieldCheck,
-    title: "Support nearby",
+    title: "Places to get help",
     description:
-      "Shelters, open shops, pharmacies, and other facilities along the route.",
+      "Open shops, shelters, stations, and other places that can make a route feel more supported.",
   },
   {
     icon: Activity,
-    title: "Activity around stops",
+    title: "How busy the area feels",
     description:
-      "Whether the surroundings are busy or quiet at different times.",
+      "Whether stops and streets feel active, quiet, or empty at different times of day.",
   },
   {
     icon: HelpCircle,
-    title: "Service uncertainty",
+    title: "If something goes wrong",
     description:
-      "How predictable the service is, and whether disruptions are reported.",
+      "How easy it is to deal with delays, cancellations, or route changes after dark.",
   },
 ];
 
@@ -112,7 +112,9 @@ export default function HeroCover() {
           </h1>
 
           <p className="hero-description">
-            A simple comparison of how travel changes between daylight and after dark.
+            A simple comparison of how travel changes
+            <br />
+            between daylight and after dark.
           </p>
 
           <button onClick={scrollToIntro} className="hero-cta" type="button">
@@ -137,7 +139,7 @@ export default function HeroCover() {
       {/* ── Intro section: "What changes after dark?" ────────────── */}
       <section ref={introRef} className="intro-section">
         <h2 className="intro-modal-title">
-          What changes after dark?
+          What feels different at night?
         </h2>
 
         <div className="intro-modal-grid">
@@ -158,7 +160,7 @@ export default function HeroCover() {
             className="hero-cta intro-modal-cta"
             onClick={continueToNext}
           >
-            Continue
+            See what matters to me
           </button>
         </div>
       </section>

@@ -8,9 +8,9 @@ import { Moon } from "lucide-react";
 const NAV_ITEMS = [
   { href: "/", label: "Home" },
   { href: "/compare", label: "Compare" },
-  { href: "/overview", label: "Context" },
-  { href: "/fairness", label: "Fairness" },
+  { href: "/fairness", label: "Map" },
   { href: "/reflection", label: "Reflection" },
+  { href: "/ending", label: "Thoughts" },
 ];
 
 export default function Navbar() {

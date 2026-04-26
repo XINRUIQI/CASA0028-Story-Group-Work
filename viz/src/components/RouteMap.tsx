@@ -117,15 +117,46 @@ function legColor(leg: Leg): string {
 interface RouteMapProps {
   legs: Leg[];
   label: string;
+  /** Renders in native emoji colors (not affected by text color) */
+  labelEmoji?: string;
   accent?: string;
   supportCount?: number;
   supportSummary?: string;
   theme?: RouteMapTheme;
 }
 
+function RouteMapLabel({
+  label,
+  labelEmoji,
+  accent,
+}: {
+  label: string;
+  labelEmoji?: string;
+  accent: string;
+}) {
+  const full = [labelEmoji, label].filter(Boolean).join(" ");
+  return (
+    <div className="route-map-label" aria-label={full}>
+      {labelEmoji ? (
+        <>
+          <span className="route-map-label-emoji" aria-hidden>
+            {labelEmoji}
+          </span>
+          <span className="route-map-label-text" style={{ color: accent }}>
+            {label}
+          </span>
+        </>
+      ) : (
+        <span className="route-map-label-text" style={{ color: accent }}>{label}</span>
+      )}
+    </div>
+  );
+}
+
 export default function RouteMap({
   legs,
   label,
+  labelEmoji,
   accent = "var(--champagne-gold)",
   supportCount,
   supportSummary,
@@ -232,7 +263,7 @@ export default function RouteMap({
   if (!MAPBOX_TOKEN) {
     return (
       <div className="route-map-placeholder">
-        <div className="route-map-label" style={{ color: accent }}>{label}</div>
+        <RouteMapLabel label={label} labelEmoji={labelEmoji} accent={accent} />
         <div className="route-map-empty">
           <p>Map requires NEXT_PUBLIC_MAPBOX_TOKEN</p>
           {legs.length > 0 && (
@@ -253,7 +284,7 @@ export default function RouteMap({
 
   return (
     <div className="route-map-card">
-      <div className="route-map-label" style={{ color: accent }}>{label}</div>
+      <RouteMapLabel label={label} labelEmoji={labelEmoji} accent={accent} />
       <div ref={containerRef} className="route-map-container" />
       {(supportSummary || supportCount != null) && (
         <div className="route-map-support">

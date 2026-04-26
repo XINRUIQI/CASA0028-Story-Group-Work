@@ -52,12 +52,13 @@ export default function CustomRouteSelector({
   const [origin, setOrigin] = useState(currentOrigin || "");
   const [destination, setDestination] = useState(currentDestination || "");
 
-  if (currentOrigin && currentOrigin !== origin) {
-    setOrigin(currentOrigin);
-  }
-  if (currentDestination && currentDestination !== destination) {
-    setDestination(currentDestination);
-  }
+  useEffect(() => {
+    if (currentOrigin) setOrigin(currentOrigin);
+  }, [currentOrigin]);
+
+  useEffect(() => {
+    if (currentDestination) setDestination(currentDestination);
+  }, [currentDestination]);
 
   useEffect(() => {
     if (_manifestCache) return;
@@ -87,7 +88,7 @@ export default function CustomRouteSelector({
     <div className="custom-route-selector">
       <div className="custom-route-label">
         <MapPin size={14} />
-        <span>Custom route</span>
+        <span>Choose a route to compare</span>
       </div>
 
       <div className="custom-route-controls">

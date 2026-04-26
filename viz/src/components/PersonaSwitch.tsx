@@ -1,13 +1,16 @@
 "use client";
 
-import { GraduationCap, Coins, Briefcase, MapPinOff } from "lucide-react";
 import type { ReactNode } from "react";
 
-export type PersonaId = "student" | "budget" | "nightworker" | "unfamiliar";
+const IMG_PREFIX = process.env.NEXT_PUBLIC_BASE_PATH || "";
+
+export type PresetPersonaId = "student" | "budget" | "nightworker" | "unfamiliar";
+export type PersonaId = PresetPersonaId | "custom";
 
 interface PersonaDef {
   id: PersonaId;
   icon: ReactNode;
+  image: string;
   label: string;
   accent: string;
   focusDimensions: string[];
@@ -22,7 +25,7 @@ export interface PersonaRoute {
   dName: string;
 }
 
-export const PERSONA_ROUTES: Record<PersonaId, PersonaRoute> = {
+export const PERSONA_ROUTES: Record<PresetPersonaId, PersonaRoute> = {
   student: {
     origin: "940GZZLUESQ",
     dest: "HUBSVS",
@@ -49,29 +52,42 @@ export const PERSONA_ROUTES: Record<PersonaId, PersonaRoute> = {
   },
 };
 
+function PersonaImg({ src, alt }: { src: string; alt: string }) {
+  return (
+    <img
+      src={`${IMG_PREFIX}${src}`}
+      alt={alt}
+      style={{ width: 16, height: 16, borderRadius: 4, objectFit: "cover" }}
+    />
+  );
+}
+
 export const PERSONA_DEFS: PersonaDef[] = [
   {
     id: "student",
-    icon: <GraduationCap size={16} />,
-    label: "Late-night student",
+    icon: <PersonaImg src="/01_late_night_student.png" alt="Student" />,
+    image: "/01_late_night_student.png",
+    label: "Late-night Student",
     accent: "var(--champagne-gold)",
     focusDimensions: ["waiting_burden", "activity_context"],
-    insight: "Waiting alone matters most. Activity and 'someone around' feeling are key.",
-    need: "I don't want to wait on an empty platform — I need to feel someone's around.",
+    insight: "Journey time predictability matters most. A route that suddenly takes much longer is the real worry.",
+    need: "I need a way home after studying late — without the journey suddenly taking much longer.",
   },
   {
     id: "budget",
-    icon: <Coins size={16} />,
-    label: "Budget traveller",
+    icon: <PersonaImg src="/02_passenger_with_luggage.png" alt="Luggage" />,
+    image: "/02_passenger_with_luggage.png",
+    label: "Passenger with Luggage",
     accent: "var(--accent-amber)",
-    focusDimensions: ["functional_cost", "service_uncertainty"],
-    insight: "Fare penalties and missed-connection recovery cost are the main concern.",
-    need: "I need the cheapest option — and no heavy penalty if I miss a connection.",
+    focusDimensions: ["functional_cost", "waiting_burden"],
+    insight: "Physical burden matters most. Walking distance, waiting time and number of changes all hit harder with luggage.",
+    need: "I'm carrying luggage — I need less walking, less waiting, and fewer changes.",
   },
   {
     id: "nightworker",
-    icon: <Briefcase size={16} />,
-    label: "Night-shift worker",
+    icon: <PersonaImg src="/03_night_shift_worker.png" alt="Night worker" />,
+    image: "/03_night_shift_worker.png",
+    label: "Night-shift Worker",
     accent: "var(--accent-emerald)",
     focusDimensions: ["service_uncertainty", "waiting_burden"],
     insight: "Service reliability and late-hour continuity are what this traveller needs.",
@@ -79,12 +95,23 @@ export const PERSONA_DEFS: PersonaDef[] = [
   },
   {
     id: "unfamiliar",
-    icon: <MapPinOff size={16} />,
-    label: "Unfamiliar traveller",
+    icon: <PersonaImg src="/04_first_time_visitor.png" alt="Visitor" />,
+    image: "/04_first_time_visitor.png",
+    label: "First-time Visitor",
     accent: "var(--accent-rose)",
     focusDimensions: ["functional_cost", "support_access"],
-    insight: "Transfer complexity and error recovery dominate the experience.",
-    need: "I need a simple route — and help nearby if I get lost or make a mistake.",
+    insight: "Transfer complexity and wayfinding support dominate the experience.",
+    need: "I need a simple route — and help nearby if I get lost or feel unsure.",
+  },
+  {
+    id: "custom",
+    icon: <PersonaImg src="/05_custom_traveller.png" alt="Custom" />,
+    image: "/05_custom_traveller.png",
+    label: "Custom Traveller",
+    accent: "var(--text-secondary)",
+    focusDimensions: [],
+    insight: "Choose your own route to explore how journey burdens change through the night.",
+    need: "I want to explore a specific route — pick your own origin and destination.",
   },
 ];
 
@@ -110,7 +137,11 @@ export default function PersonaSwitch({ active, onChange }: PersonaSwitchProps) 
                 : undefined
             }
           >
-            {p.icon}
+            <img
+              src={`${IMG_PREFIX}${p.image}`}
+              alt={p.label}
+              className="persona-switch-img"
+            />
             <span>{p.label}</span>
           </button>
         ))}

@@ -2,38 +2,50 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  User,
+  Moon,
+  Luggage,
+  MapPin,
+  ArrowRight,
+  type LucideIcon,
+} from "lucide-react";
 import HeroCover from "@/components/HeroCover";
 import type { ContextTag } from "@/lib/types";
 
-/* ── Page 1: Context checkboxes ──────────────────────────────── */
+/* ── Page 1: Context pills ───────────────────────────────────── */
 
-const CONTEXT_CHECKS: { value: ContextTag; label: string }[] = [
-  { value: "travelling-alone", label: "Travelling alone" },
-  { value: "returning-late", label: "Returning late" },
-  { value: "carrying-bags", label: "Carrying bags" },
-  { value: "unfamiliar-area", label: "Unfamiliar with the area" },
+const CONTEXT_PILLS: {
+  value: ContextTag;
+  label: string;
+  Icon: LucideIcon;
+}[] = [
+  { value: "travelling-alone", label: "Travelling alone", Icon: User },
+  { value: "returning-late", label: "Returning late", Icon: Moon },
+  { value: "carrying-bags", label: "Carrying bags", Icon: Luggage },
+  { value: "unfamiliar-area", label: "Unfamiliar with the area", Icon: MapPin },
 ];
 
 const CONTEXT_NEEDS: Record<ContextTag, string[]> = {
   "travelling-alone": [
-    "Open shops or staffed places along walking routes (support nearby)",
-    "Routes where other people are likely to be around",
-    "Well-lit paths between stops",
+    "Avoid long, quiet walking sections",
+    "Keep close to open or staffed places",
+    "Choose transfers that still feel active",
   ],
   "returning-late": [
-    "Less time waiting at stops (sensitivity to uncertainty)",
-    "High fault tolerance — backup options if a bus is missed",
-    "Reliable late-night service with shorter gaps",
+    "Make sure services are still running",
+    "Reduce waiting time after midnight",
+    "Watch out for routes that suddenly take much longer",
   ],
   "carrying-bags": [
-    "Shorter walking segments between stops",
-    "Fewer interchanges and level changes",
-    "Shelter and seating at waiting points",
+    "Keep walking distance manageable",
+    "Avoid too many stairs or platform changes",
+    "Prefer direct routes over complex transfers",
   ],
   "unfamiliar-area": [
-    "Simple, easy-to-follow routes with fewer transfers",
-    "Well-signed interchanges and clear wayfinding",
-    "Lower cost of mistakes — easier to recover from a wrong stop",
+    "Choose a route that is easy to follow",
+    "Look for clear and simple interchange points",
+    "Stay near places where help is available",
   ],
   commuting: [
     "Predictable journey time with consistent service",
@@ -111,6 +123,15 @@ function Silhouette({ glow }: { glow: string }) {
   );
 }
 
+/* Moon accent in card corner (reference dusk hero) */
+function TonightCardMoonDecor() {
+  return (
+    <div className="ctx-card-moon" aria-hidden>
+      <Moon className="ctx-card-moon-lucide" size={44} strokeWidth={1.2} />
+    </div>
+  );
+}
+
 /* ── Page component ──────────────────────────────────────────── */
 
 export default function LandingPage() {
@@ -122,6 +143,15 @@ export default function LandingPage() {
     setContexts((prev) =>
       prev.includes(ctx) ? prev.filter((c) => c !== ctx) : [...prev, ctx],
     );
+  };
+
+  const goToCompare = () => {
+    const params = new URLSearchParams();
+    if (contexts.length > 0) {
+      params.set("contexts", contexts.join(","));
+    }
+    const qs = params.toString();
+    router.push(qs ? `/compare?${qs}` : "/compare");
   };
 
   const allNeeds: string[] = [];
@@ -156,9 +186,6 @@ export default function LandingPage() {
 
       {/* ═══════════════ Page 1: Context selection ═══════════════ */}
       <section className="ctx-page">
-        {/* Map-like background lines */}
-        <div className="ctx-map-bg" />
-
         <div className="ctx-inner">
           {/* Left: silhouette */}
           <div className="ctx-silhouette">
@@ -167,57 +194,77 @@ export default function LandingPage() {
 
           {/* Right: cards */}
           <div className="ctx-cards">
-            {/* Tonight I am... */}
-            <div className="ctx-card">
-              <h2 className="ctx-card-title">
-                Tonight I am...{" "}
-                <span className="ctx-card-hint">
-                  (Please select your context)
-                </span>
-              </h2>
-              <div className="ctx-checks">
-                {CONTEXT_CHECKS.map((opt) => {
+            {/* Set up journey: kicker + title + chips + CTA */}
+            <div className="ctx-card ctx-card--tonight">
+              <TonightCardMoonDecor />
+              <header className="ctx-tonight-header">
+                <p className="ctx-tonight-kicker">Set up my journey</p>
+                <h2 className="ctx-tonight-title">
+                  Choose the situations that apply to your journey.
+                </h2>
+              </header>
+              <div
+                className="ctx-pill-grid ctx-pill-grid--tonight"
+                role="group"
+                aria-label="Situations that apply to your journey"
+              >
+                {CONTEXT_PILLS.map((opt) => {
                   const active = contexts.includes(opt.value);
+                  const { Icon } = opt;
                   return (
                     <button
                       key={opt.value}
                       type="button"
-                      className="ctx-check-row"
+                      className={`ctx-pill${active ? " ctx-pill--selected" : ""}`}
+                      aria-pressed={active}
                       onClick={() => toggleContext(opt.value)}
                     >
-                      <span
-                        className={`ctx-checkbox ${active ? "checked" : ""}`}
-                      >
-                        {active && (
-                          <svg width="12" height="12" viewBox="0 0 12 12">
+                      <span className="ctx-pill-icon" aria-hidden>
+                        <Icon
+                          className="ctx-pill-icon-svg"
+                          strokeWidth={1.75}
+                          size={17}
+                        />
+                      </span>
+                      <span className="ctx-pill-label">{opt.label}</span>
+                      <span className="ctx-pill-indicator" aria-hidden>
+                        {active ? (
+                          <svg
+                            className="ctx-pill-check"
+                            width="11"
+                            height="11"
+                            viewBox="0 0 11 11"
+                            fill="none"
+                          >
                             <path
-                              d="M2.5 6L5 8.5L9.5 3.5"
+                              d="M2.2 5.4L4.4 7.6L8.8 2.6"
                               stroke="currentColor"
-                              strokeWidth="1.8"
+                              strokeWidth="1.5"
                               strokeLinecap="round"
                               strokeLinejoin="round"
-                              fill="none"
                             />
                           </svg>
-                        )}
+                        ) : null}
                       </span>
-                      <span className="ctx-check-label">{opt.label}</span>
                     </button>
                   );
                 })}
               </div>
+              <button
+                type="button"
+                className="ctx-journey-cta"
+                onClick={goToCompare}
+              >
+                Choose my journey
+                <ArrowRight className="ctx-journey-cta-arrow" size={18} strokeWidth={2} aria-hidden />
+              </button>
             </div>
 
-            {/* So, I need... */}
+            {/* What may matter more */}
             <div
               className={`ctx-card ctx-needs-card ${allNeeds.length > 0 ? "has-needs" : ""}`}
             >
-              <h2 className="ctx-card-title">
-                So, I need...{" "}
-                <span className="ctx-card-hint">
-                  (System dynamically populates based on selection)
-                </span>
-              </h2>
+              <h2 className="ctx-card-title">What may matter more?</h2>
               {allNeeds.length === 0 ? (
                 <p className="ctx-needs-empty">
                   Select one or more situations above to see what matters most.
@@ -229,24 +276,6 @@ export default function LandingPage() {
                   ))}
                 </ul>
               )}
-            </div>
-
-            {/* Jump to compare page */}
-            <div className="ctx-cta-wrap">
-              <button
-                type="button"
-                className="hero-cta"
-                onClick={() => {
-                  const params = new URLSearchParams();
-                  if (contexts.length > 0) {
-                    params.set("contexts", contexts.join(","));
-                  }
-                  const qs = params.toString();
-                  router.push(qs ? `/compare?${qs}` : "/compare");
-                }}
-              >
-                Choose my journey
-              </button>
             </div>
           </div>
         </div>

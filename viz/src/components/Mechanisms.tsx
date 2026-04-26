@@ -27,56 +27,56 @@ const ENTRIES: MechanismEntry[] = [
   {
     key: "waiting",
     icon: <Timer size={16} />,
-    label: "Waiting Time at stations",
-    source: "waiting_burden",
+    label: "Wait Time",
+    source: "SERVICE FREQUENCY + TRANSFER POINTS",
     description:
-      "Expected wait time accumulated across all transfer points, weighted by line-specific headway at the departure hour.",
-    formula: "E[W] = Σ (headway_i × penalty_i) for each transfer i",
+      "Estimates how long you may spend waiting at stations, stops, or transfer points.",
+    formula: "Expected wait = half of the service interval at each waiting point",
   },
   {
     key: "support",
     icon: <ShieldCheck size={16} />,
-    label: "Support nearby",
-    source: "support_access",
+    label: "Nearby Help",
+    source: "NEARBY PLACES + OPENING STATUS",
     description:
-      "Number of support points (shops, pharmacies, healthcare, toilets, AEDs) currently open within 300 m of every station visited on the route.",
-    formula: "support_open = Σ POIs_within_300m(open_at_t) along route",
+      "Counts useful places that are still open near the route, such as shops, cafés, toilets, pharmacies, or AED points.",
+    formula: "Nearby help = open support places within 300 m of route stops",
   },
   {
     key: "service",
     icon: <HelpCircle size={16} />,
-    label: "Service uncertainty",
-    source: "service_uncertainty",
+    label: "Service Reliability",
+    source: "LIVE SERVICE STATUS + TIMETABLE GAPS + RECOVERY TIME",
     description:
-      "Composite score from live-vs-scheduled headway gap, disruption status, and residual-time variance. Higher = less predictable.",
-    formula: "U = w1·gap_ratio + w2·disruption_flag + w3·variance",
+      "Shows how likely the service is to run as planned, and how much extra time you may need if something goes wrong.",
+    formula: "Reliability risk = delays + disruptions + long service gaps + recovery penalty",
   },
   {
-    key: "lighting",
+    key: "activity",
     icon: <Lightbulb size={16} />,
-    label: "Lighting proxy",
-    source: "lighting_proxy",
+    label: "Activity Nearby",
+    source: "NIGHT-TIME ACTIVITY + ROUTE CONTEXT",
     description:
-      "Mean count of street lamps per 100 m of the walking segments of the journey, classified into well / moderate / sparse.",
-    formula: "lamps_per_walk = total_lamps / (walk_distance_m / 100)",
+      "Shows whether the areas around the route still feel active, quiet, or empty at that time of day.",
+    formula: "Activity nearby = activity level around stops and walking sections",
   },
   {
     key: "recovery",
     icon: <LifeBuoy size={16} />,
-    label: "Recovery time",
-    source: "journey_recovery",
+    label: "Backup Options",
+    source: "ALTERNATIVE SERVICES + MISSED CONNECTIONS + EXTRA WAIT TIME",
     description:
-      "If the worst interchange is missed, expected additional wait until the next viable service, averaged across all transfer points.",
-    formula: "E[penalty] = mean(extra_wait_min across transfers)",
+      "Estimates how easy it is to recover if a train is delayed, a bus is diverted, or a connection is missed.",
+    formula: "Backup time = extra time needed to find the next workable option",
   },
   {
     key: "safety",
     icon: <AlertTriangle size={16} />,
-    label: "Safety Exposure Level",
-    source: "safety_exposure",
+    label: "Route Exposure",
+    source: "SAFETY INCIDENT DATA + WALKING SECTIONS + ROUTE BUFFER",
     description:
-      "Corridor-level percentile of late-night incident density intersected with the route polyline, expressed as 0–100.",
-    formula: "exposure = percentile(crime_density ∩ route_buffer_50m)",
+      "Measures how much the route overlaps with areas of higher reported safety incidents after dark, especially along walking sections.",
+    formula: "Route exposure = reported night-time incidents near the route",
   },
 ];
 
@@ -85,11 +85,10 @@ export default function Mechanisms({ onClose }: MechanismsProps) {
     <div className="mechanisms-panel">
       <div className="mechanisms-header">
         <div>
-          <p className="section-label">Behind the numbers</p>
-          <h2 className="mechanisms-title">Mechanisms</h2>
+          <p className="section-label">Behind the scores</p>
+          <h2 className="mechanisms-title">How the indicators are estimated</h2>
           <p className="mechanisms-sub">
-            How each of the six dimensions is computed. These are placeholders —
-            exact formulas will land here.
+            Each score is built from route, service, and nearby-context data. The aim is not to label one route as &ldquo;best&rdquo;, but to show what may become harder when you leave later.
           </p>
         </div>
         {onClose && (
@@ -115,7 +114,7 @@ export default function Mechanisms({ onClose }: MechanismsProps) {
             {e.formula && (
               <code className="mechanisms-formula">{e.formula}</code>
             )}
-            <div className="mechanisms-source">source: {e.source}</div>
+            <div className="mechanisms-source">DATA USED: {e.source}</div>
           </div>
         ))}
       </div>

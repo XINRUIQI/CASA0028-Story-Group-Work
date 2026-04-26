@@ -1,11 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { GraduationCap, Coins, Briefcase, MapPinOff } from "lucide-react";
+
+const IMG_PREFIX = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 interface PresetRoute {
   id: string;
-  icon: React.ReactNode;
+  image: string;
   label: string;
   description: string;
   originName: string;
@@ -19,8 +20,8 @@ interface PresetRoute {
 const PRESETS: PresetRoute[] = [
   {
     id: "student",
-    icon: <GraduationCap size={18} />,
-    label: "Late-night student",
+    image: "/01_late_night_student.png",
+    label: "Late-night Student",
     description: "UCL to Seven Sisters — returning from the library",
     originName: "Euston Square",
     originId: "940GZZLUESQ",
@@ -31,9 +32,9 @@ const PRESETS: PresetRoute[] = [
   },
   {
     id: "budget",
-    icon: <Coins size={18} />,
-    label: "Budget traveller",
-    description: "Stratford to Brixton — cheapest late options",
+    image: "/02_passenger_with_luggage.png",
+    label: "Passenger with Luggage",
+    description: "Stratford to Brixton — less walking, fewer changes",
     originName: "Stratford",
     originId: "940GZZLUSTD",
     destName: "Brixton",
@@ -43,8 +44,8 @@ const PRESETS: PresetRoute[] = [
   },
   {
     id: "nightworker",
-    icon: <Briefcase size={18} />,
-    label: "Night-shift worker",
+    image: "/03_night_shift_worker.png",
+    label: "Night-shift Worker",
     description: "King's Cross to Barking — finishing late",
     originName: "King's Cross",
     originId: "940GZZLUKSX",
@@ -55,8 +56,8 @@ const PRESETS: PresetRoute[] = [
   },
   {
     id: "unfamiliar",
-    icon: <MapPinOff size={18} />,
-    label: "Unfamiliar traveller",
+    image: "/04_first_time_visitor.png",
+    label: "First-time Visitor",
     description: "Liverpool Street to Greenwich — first time in London",
     originName: "Liverpool Street",
     originId: "940GZZLULVT",
@@ -90,9 +91,11 @@ export default function PresetJourneys() {
           className="preset-card"
           onClick={() => handleClick(p)}
         >
-          <span className="preset-icon" style={{ color: p.accentColor }}>
-            {p.icon}
-          </span>
+          <img
+            src={`${IMG_PREFIX}${p.image}`}
+            alt={p.label}
+            className="preset-persona-img"
+          />
           <span className="preset-label">{p.label}</span>
           <span className="preset-desc">{p.description}</span>
         </button>

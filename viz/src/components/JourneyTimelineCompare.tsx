@@ -1,12 +1,22 @@
 "use client";
 
-import { Zap, Clock, PoundSterling, Footprints, Shuffle } from "lucide-react";
+import { createElement } from "react";
+import {
+  Zap,
+  Clock,
+  PoundSterling,
+  Footprints,
+  Shuffle,
+  Bus,
+  TrainFront,
+  type LucideIcon,
+} from "lucide-react";
 import type { Journey, Leg, CardData } from "@/lib/api";
 
 /* ──────────────────────────────────────────────────────────────
  * Journey Timeline Compare
  * Narrative‑style horizontal comparison of walk / wait / ride /
- * transfer segments across Day, Evening and Late Night departures.
+ * walk / wait / ride segments across Day, Evening and Late Night departures.
  *
  * Wait durations come from the backend `waiting_burden.leg_waits`
  * field (expected_wait_min ≈ headway / 2). When that data is
@@ -14,7 +24,7 @@ import type { Journey, Leg, CardData } from "@/lib/api";
  * heuristic fills in so the component never breaks.
  * ────────────────────────────────────────────────────────────── */
 
-type SegmentKind = "walk" | "wait" | "ride" | "transfer";
+type SegmentKind = "walk" | "wait" | "ride";
 
 interface LegWait {
   leg_index: number;
@@ -32,6 +42,8 @@ interface Segment {
   durationMin: number;
   risk?: boolean;
   stopName?: string;
+  /** Walking between transit legs (same teal pill as access/egress; tooltip says “interchange”). */
+  interchange?: boolean;
   headwayMin?: number;
   gapRatio?: number | null;
 }
@@ -39,7 +51,6 @@ interface Segment {
 interface TimelineRow {
   key: string;
   band: "Day" | "Evening" | "Late Night";
-  time: string;
   totalMin: number;
   segments: Segment[];
   isNight: boolean;
@@ -125,21 +136,24 @@ function buildSegments(
           kind: "walk",
           label: "Walk",
           durationMin: Math.max(leg.duration_min, 1),
+          stopName: leg.arrival_point?.name,
         });
       } else if (isLast) {
         out.push({
           kind: "walk",
           label: "Walk",
           durationMin: Math.max(leg.duration_min, 1),
+          stopName: leg.departure_point?.name,
           // A long final walk at night is a tangible risk signal.
           risk: isNight && leg.duration_min >= 8,
         });
       } else {
         out.push({
-          kind: "transfer",
-          label: "Transfer",
+          kind: "walk",
+          label: "Walk",
           durationMin: Math.max(leg.duration_min, 2),
           stopName: leg.arrival_point?.name,
+          interchange: true,
         });
       }
       return;
@@ -185,6 +199,54 @@ function buildSegments(
   return out;
 }
 
+/**
+ * Planner `duration_min` is often larger than the sum of leg durations
+ * (interchange padding, rounding, in‑vehicle time). We used to show the
+ * difference as a trailing dashed "filler" cell, which reads like a hole
+ * between legs. Fold that gap into interchange walks first, then any walk,
+ * then ride legs proportionally, so the bar matches the headline total.
+ */
+function absorbPlannerDurationGap(
+  segments: Segment[],
+  targetTotalMin: number,
+): Segment[] {
+  const sum = segments.reduce((a, s) => a + s.durationMin, 0);
+  const gap = targetTotalMin - sum;
+  if (gap <= 0.25 || segments.length === 0) {
+    return segments.map((s) => ({ ...s }));
+  }
+
+  const out = segments.map((s) => ({ ...s }));
+  const indicesWhere = (kinds: SegmentKind[]) => {
+    const idx: number[] = [];
+    out.forEach((s, i) => {
+      if (kinds.includes(s.kind)) idx.push(i);
+    });
+    return idx;
+  };
+
+  const interchangeWalks = out
+    .map((s, i) => (s.kind === "walk" && s.interchange ? i : -1))
+    .filter((i) => i >= 0);
+  let pool =
+    interchangeWalks.length > 0
+      ? interchangeWalks
+      : indicesWhere(["walk"]);
+  if (pool.length === 0) pool = indicesWhere(["ride"]);
+  if (pool.length === 0) {
+    pool = out.map((_, i) => i);
+  }
+
+  const weights = pool.map((i) => Math.max(out[i].durationMin, 0.5));
+  const wsum = weights.reduce((a, b) => a + b, 0);
+  pool.forEach((i, j) => {
+    const add = (gap * weights[j]) / wsum;
+    out[i] = { ...out[i], durationMin: out[i].durationMin + add };
+  });
+
+  return out;
+}
+
 function buildRow(
   time: string,
   journey: Journey | null,
@@ -198,7 +260,6 @@ function buildRow(
     return {
       key: time,
       band,
-      time,
       totalMin: 0,
       segments: [],
       isNight,
@@ -216,15 +277,16 @@ function buildRow(
     | undefined;
   const legWaits = Array.isArray(wb?.leg_waits) ? wb!.leg_waits! : null;
 
-  const segments = buildSegments(journey.legs, time, isNight, legWaits);
+  const built = buildSegments(journey.legs, time, isNight, legWaits);
+  const segTotal = built.reduce((s, x) => s + x.durationMin, 0);
+  const totalMin = Math.max(segTotal, journey.duration_min);
+  const segments = absorbPlannerDurationGap(built, totalMin);
   const hasRisk = segments.some((s) => s.risk);
-  const segTotal = segments.reduce((s, x) => s + x.durationMin, 0);
 
   return {
     key: time,
     band,
-    time,
-    totalMin: Math.max(segTotal, journey.duration_min),
+    totalMin,
     segments,
     isNight,
     hasRisk,
@@ -277,35 +339,20 @@ function formatWalk(metres: number): string {
   return `~${Math.round(metres)} m`;
 }
 
+/* Icon-only pills: mode name stays in title / aria-label for hover & screen readers. */
+const PILL_ICON_SIZE = 17;
+
+function segmentIcon(seg: Segment): LucideIcon {
+  if (seg.kind === "walk") return Footprints;
+  if (seg.kind === "wait") return Clock;
+  const l = (seg.label || "").toLowerCase();
+  if (l.includes("bus")) return Bus;
+  return TrainFront;
+}
+
 /* ── Segment pill ────────────────────────────────────────────── */
 
-function SegmentPill({
-  seg,
-  maxTotal,
-}: {
-  seg: Segment;
-  maxTotal: number;
-}) {
-  const basis = Math.max((seg.durationMin / maxTotal) * 100, 3);
-
-  if (seg.kind === "transfer") {
-    return (
-      <div
-        className="jtc-connector"
-        style={{ flexBasis: `${basis}%` }}
-        title={
-          seg.stopName
-            ? `Transfer via ${seg.stopName.split(/[,(]/)[0].trim()} · ${seg.durationMin} min`
-            : `Transfer · ${seg.durationMin} min`
-        }
-      >
-        <span className="jtc-connector-line" />
-        <span className="jtc-connector-label">Transfer</span>
-        <span className="jtc-connector-line" />
-      </div>
-    );
-  }
-
+function SegmentPill({ seg }: { seg: Segment }) {
   const classes = [
     "jtc-pill",
     `jtc-pill--${seg.kind}`,
@@ -314,8 +361,20 @@ function SegmentPill({
     .filter(Boolean)
     .join(" ");
 
+  const mins = Math.round(seg.durationMin * 10) / 10;
   let tip = `${seg.label} · ${seg.durationMin} min`;
-  if (seg.kind === "ride" && seg.stopName) {
+  if (seg.kind === "walk") {
+    const place = seg.stopName?.split(/[,(]/)[0].trim();
+    if (seg.interchange) {
+      tip = place
+        ? `Interchange walk via ${place} · ${mins} min`
+        : `Interchange walk · ${mins} min`;
+    } else if (place) {
+      tip = `Walk · ${mins} min · ${place}`;
+    } else {
+      tip = `Walk · ${mins} min`;
+    }
+  } else if (seg.kind === "ride" && seg.stopName) {
     tip = `${seg.label} from ${seg.stopName.split(/[,(]/)[0].trim()} · ${seg.durationMin} min`;
   } else if (seg.kind === "wait" && seg.headwayMin != null) {
     tip = `Expected wait ${seg.durationMin} min · headway ${seg.headwayMin} min${
@@ -323,9 +382,21 @@ function SegmentPill({
     }`;
   }
 
+  const shortLabel = seg.kind === "walk"
+    ? (seg.interchange ? "Interchange" : "Walk")
+    : seg.kind === "wait"
+      ? "Wait"
+      : seg.label;
+  const badge = `${shortLabel} · ${mins} min`;
+
   return (
-    <div className={classes} style={{ flexBasis: `${basis}%` }} title={tip}>
-      <span className="jtc-pill-label">{seg.label}</span>
+    <div className={classes} aria-label={tip} data-tip={badge}>
+      <span className="jtc-pill-ico" aria-hidden>
+        {createElement(segmentIcon(seg), {
+          size: PILL_ICON_SIZE,
+          strokeWidth: 2.35,
+        })}
+      </span>
     </div>
   );
 }
@@ -345,7 +416,8 @@ export default function JourneyTimelineCompare({
 
   if (!rows.length) return null;
 
-  // Shared scale across *available* rows so empty slots don't squash the bar.
+  // One shared time scale: the longest journey uses the full timeline width;
+  // shorter rows use a proportionally narrower bar (all left‑aligned).
   const maxTotal = Math.max(
     ...rows.filter((r) => !r.unavailable).map((r) => r.totalMin),
     1,
@@ -354,11 +426,10 @@ export default function JourneyTimelineCompare({
   return (
     <div className="jtc-panel">
       <div className="jtc-header">
-        <h3 className="jtc-title">Journey Timeline</h3>
-        <p className="jtc-subtitle">
-          Same route, three departures. Waits below are the real expected
-          wait (≈ TfL headway ÷ 2); walking and riding come from the live
-          journey plan.
+        <h3 className="choose-chart-title">Journey Timeline</h3>
+        <p className="compare-route-desc compare-route-desc--jtc">
+          The route is the same, but the balance of walking, waiting, and riding
+          changes depending on when you leave. 
         </p>
       </div>
 
@@ -372,7 +443,6 @@ export default function JourneyTimelineCompare({
           >
             <div className="jtc-row-label">
               <div className="jtc-row-band">{row.band}</div>
-              <div className="jtc-row-time">{row.time}</div>
             </div>
             <div className="jtc-row-main">
               {row.unavailable ? (
@@ -388,17 +458,63 @@ export default function JourneyTimelineCompare({
                 </div>
               ) : (
                 <>
-                  <div className="jtc-row-track">
-                    {row.segments.map((seg, i) => (
-                      <SegmentPill key={i} seg={seg} maxTotal={maxTotal} />
-                    ))}
-                  </div>
+                  {(() => {
+                    const segSum = row.segments.reduce(
+                      (a, s) => a + s.durationMin,
+                      0,
+                    );
+                    const remainder = Math.max(0, row.totalMin - segSum);
+                    const trackWidthPct = (row.totalMin / maxTotal) * 100;
+                    const gridTemplateColumns =
+                      row.segments.length === 0
+                        ? "minmax(0, 1fr)"
+                        : [
+                            ...row.segments.map(
+                              (s) => `minmax(0, ${s.durationMin}fr)`,
+                            ),
+                            ...(remainder > 0.5
+                              ? [`minmax(0, ${remainder}fr)`]
+                              : []),
+                          ].join(" ");
+                    return (
+                      <div className="jtc-track-shell">
+                        <div
+                          className="jtc-row-track"
+                          style={{
+                            width: `${trackWidthPct}%`,
+                            gridTemplateColumns,
+                          }}
+                        >
+                          {row.segments.length === 0 ? (
+                            <div
+                              className="jtc-timeline-filler jtc-timeline-filler--solo"
+                              title="Journey time"
+                              aria-hidden
+                            />
+                          ) : (
+                            <>
+                              {row.segments.map((seg, i) => (
+                                <SegmentPill key={i} seg={seg} />
+                              ))}
+                              {remainder > 0.5 && (
+                                <div
+                                  className="jtc-timeline-filler"
+                                  title={`~${Math.round(remainder * 10) / 10} min not broken down into the segments above (e.g. in‑vehicle or planner detail)`}
+                                  aria-hidden
+                                />
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
                   <div className="jtc-row-stats" aria-label="Journey stats">
                     <span
                       className="jtc-stat"
                       title={`${row.totalMin} min total journey time`}
                     >
-                      <Clock size={11} />
+                      <Clock size={14} />
                       <span className="jtc-stat-value">{row.totalMin}</span>
                       <span className="jtc-stat-unit">min</span>
                     </span>
@@ -406,7 +522,7 @@ export default function JourneyTimelineCompare({
                       className="jtc-stat"
                       title="Fare returned by TfL Journey Planner"
                     >
-                      <PoundSterling size={11} />
+                      <PoundSterling size={14} />
                       <span className="jtc-stat-value">
                         {row.fareDisplay}
                       </span>
@@ -415,13 +531,13 @@ export default function JourneyTimelineCompare({
                       className="jtc-stat"
                       title="Total walking distance across all legs"
                     >
-                      <Footprints size={11} />
+                      <Footprints size={14} />
                       <span className="jtc-stat-value">
                         {formatWalk(row.walkDistanceM)}
                       </span>
                     </span>
                     <span className="jtc-stat" title="Number of line changes">
-                      <Shuffle size={11} />
+                      <Shuffle size={14} />
                       <span className="jtc-stat-value">{row.transfers}</span>
                       <span className="jtc-stat-unit">
                         {row.transfers === 1 ? "transfer" : "transfers"}

@@ -10,11 +10,11 @@ export default function FairnessPage() {
 
       {/* ── Navigation ── */}
       <div className="fairness-nav-footer">
-        <Link href="/compare" className="btn-primary px-6 py-3">
-          Compare a journey →
+        <Link href="/compare" className="refl-nav-btn">
+          ← Compare a journey
         </Link>
-        <Link href="/reflection" className="btn-secondary px-6 py-3">
-          Reflection & limits
+        <Link href="/reflection" className="refl-nav-btn refl-nav-secondary">
+          Reflection & limits →
         </Link>
       </div>
     </div>

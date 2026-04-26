@@ -39,7 +39,8 @@ STATIONS = [
     {"id": "940GZZLUCTN", "name": "Camden Town",             "zone": "North-Central"},
 ]
 
-COMPARE_TIMES = "18:00,21:00,23:30"
+COMPARE_TIMES = "14:00,19:00,00:00"
+DENSE_CURVE_TIMES = "14:00,16:00,18:00,20:00,22:00,00:00,02:00"
 
 # Track progress
 _success = 0
@@ -146,6 +147,14 @@ def main():
             "origin": origin,
             "destination": dest,
             "times": COMPARE_TIMES,
+        })
+
+        time.sleep(0.3)
+
+        fetch_and_save("/compare/cards", {
+            "origin": origin,
+            "destination": dest,
+            "times": DENSE_CURVE_TIMES,
         })
 
         time.sleep(0.3)

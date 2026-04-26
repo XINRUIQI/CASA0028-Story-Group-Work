@@ -1,17 +1,12 @@
 "use client";
 
 import type { CardData, Journey, JourneyRecoveryResult } from "@/lib/api";
-import { computeJourneyTotal } from "@/lib/computeJourneyTotal";
 import {
-  Clock,
-  Footprints,
-  ArrowLeftRight,
   Timer,
   ShieldCheck,
   HelpCircle,
   LifeBuoy,
   AlertTriangle,
-  Coins,
   Activity,
 } from "lucide-react";
 
@@ -22,8 +17,6 @@ interface OptionCardProps {
   cards?: Record<string, CardData>;
   recovery?: JourneyRecoveryResult | null;
   highlighted?: string[];
-  origin?: string;
-  destination?: string;
 }
 
 const LETTER = ["A", "B", "C", "D"];
@@ -34,9 +27,6 @@ interface WaitingBurdenCard {
   total_expected_wait_min?: number;
   max_single_wait_min?: number;
   wait_segments?: number;
-}
-interface FunctionalCostCard {
-  fare?: number | null;
 }
 interface SupportAccessCard {
   total_support_open?: number;
@@ -71,10 +61,6 @@ function asFiniteNumber(value: unknown): number | null {
   if (value == null || value === "") return null;
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : null;
-}
-
-function formatFarePence(value: number): string {
-  return `£${(value / 100).toFixed(2)}`;
 }
 
 function titleCase(s?: string | null): string {
@@ -125,37 +111,6 @@ function toneByRecoveryMinutes(minutes?: number | null): "good" | "warn" | "bad"
   return "good";
 }
 
-function estimateFarePence(
-  journey: Journey,
-  origin?: string,
-  destination?: string,
-): { value: string; sub?: string } {
-  const transitModes = journey.legs
-    .filter((leg) => !leg.is_walking)
-    .map((leg) => leg.mode_id);
-
-  if (transitModes.length > 0 && transitModes.every((mode) => mode === "bus")) {
-    return { value: `${formatFarePence(175)} est.`, sub: "Flat bus fare estimate" };
-  }
-
-  if (origin === "940GZZLUSTD" && destination === "940GZZLUBXN") {
-    return { value: `${formatFarePence(310)} est.`, sub: "TfL PAYG off-peak fallback" };
-  }
-
-  return { value: "Not returned", sub: "TfL fare unavailable" };
-}
-
-function buildFareDisplay(
-  journey: Journey,
-  functionalCost: FunctionalCostCard,
-  origin?: string,
-  destination?: string,
-): { value: string; sub?: string } {
-  const fare = asFiniteNumber(journey.fare) ?? asFiniteNumber(functionalCost.fare);
-  if (fare != null) return { value: formatFarePence(fare) };
-  return estimateFarePence(journey, origin, destination);
-}
-
 function buildRecoveryDisplay(
   journey: Journey,
   waitingBurden: WaitingBurdenCard,
@@ -165,9 +120,6 @@ function buildRecoveryDisplay(
   if (recovery?.mean_penalty_min != null) {
     return {
       value: `${formatNum(recovery.mean_penalty_min, 1)} min avg`,
-      sub: recovery.overall_resilience
-        ? `Resilience: ${titleCase(recovery.overall_resilience)}`
-        : undefined,
       tone: toneByResilience(recovery.overall_resilience),
     };
   }
@@ -175,7 +127,6 @@ function buildRecoveryDisplay(
   if (recovery?.overall_resilience === "no transfers" || journey.transfers === 0) {
     return {
       value: "No transfers",
-      sub: "No interchange recovery needed",
       tone: "good",
     };
   }
@@ -191,7 +142,6 @@ function buildRecoveryDisplay(
   if (expectedSingleWait == null) {
     return {
       value: "Not returned",
-      sub: "Recovery API unavailable",
       tone: "warn",
     };
   }
@@ -204,10 +154,6 @@ function buildRecoveryDisplay(
   const rounded = Math.max(1, Math.round(estimate));
   return {
     value: `~${rounded} min est.`,
-    sub:
-      fallbackLines != null
-        ? `Fallback lines: ${fallbackLines}`
-        : "Estimated from headway",
     tone: toneByRecoveryMinutes(rounded),
   };
 }
@@ -221,8 +167,6 @@ export default function OptionCard({
   cards,
   recovery,
   highlighted = [],
-  origin,
-  destination,
 }: OptionCardProps) {
   const displayTime = time === "00:00" ? "24:00" : time;
 
@@ -239,86 +183,40 @@ export default function OptionCard({
     );
   }
 
-  const fc = (cards?.functional_cost ?? {}) as FunctionalCostCard & CardData;
   const wb = (cards?.waiting_burden ?? {}) as WaitingBurdenCard & CardData;
   const sa = (cards?.support_access ?? {}) as SupportAccessCard & CardData;
   const su = (cards?.service_uncertainty ?? {}) as ServiceUncertaintyCard & CardData;
   const ac = (cards?.activity_context ?? {}) as ActivityContextCard & CardData;
   const se = (cards?.safety_exposure ?? {}) as SafetyExposureCard & CardData;
-  const fareDisplay = buildFareDisplay(journey, fc, origin, destination);
   const recoveryDisplay = buildRecoveryDisplay(journey, wb, su, recovery);
-  const effectiveTotal = computeJourneyTotal(journey, time, cards);
 
   const metrics = [
     {
-      key: "duration",
-      icon: <Clock size={14} />,
-      label: "Total time",
-      value: `${effectiveTotal} min`,
-      tone: toneByMinutes(effectiveTotal, 60, 35),
-      source: "functional_cost",
-    },
-    {
-      key: "fare",
-      icon: <Coins size={14} />,
-      label: "Fare",
-      value: fareDisplay.value,
-      sub: fareDisplay.sub,
-      tone: "warn" as const,
-      source: "functional_cost",
-    },
-    {
-      key: "walking",
-      icon: <Footprints size={14} />,
-      label: "Walking (est.)",
-      value: `~${Math.round(journey.walk_distance_m)} m`,
-      tone: toneByMinutes(journey.walk_distance_m / 80, 12, 6),
-      source: "functional_cost",
-    },
-    {
-      key: "transfers",
-      icon: <ArrowLeftRight size={14} />,
-      label: "Transfers",
-      value: String(journey.transfers),
-      tone: journey.transfers >= 3 ? "bad" : journey.transfers >= 2 ? "warn" : "good",
-      source: "functional_cost",
-    },
-    {
       key: "waiting",
       icon: <Timer size={14} />,
-      label: "Waiting burden",
+      label: "Wait Time",
       value:
         wb.total_expected_wait_min != null
           ? `~${formatNum(wb.total_expected_wait_min, 1)} min`
           : "—",
-      sub:
-        wb.max_single_wait_min != null
-          ? `single ~${formatNum(wb.max_single_wait_min, 1)} min`
-          : undefined,
       tone: toneByMinutes(wb.total_expected_wait_min, 12, 5),
       source: "waiting_burden",
     },
     {
       key: "support",
       icon: <ShieldCheck size={14} />,
-      label: "Support nearby",
+      label: "Nearby Help",
       value:
         sa.total_support_open != null
           ? `${sa.total_support_open} open`
           : "—",
-      sub:
-        sa.route_support_index != null
-          ? `Index ${formatNum(sa.route_support_index, 2)}`
-          : sa.total_support_all != null
-            ? `of ${sa.total_support_all} within 300 m`
-            : undefined,
       tone: toneBySupport(sa.total_support_open),
       source: "support_access",
     },
     {
       key: "activity",
       icon: <Activity size={14} />,
-      label: "Activity context",
+      label: "Activity Nearby",
       value:
         ac.route_activity_index != null
           ? `Index ${formatNum(ac.route_activity_index, 2)}`
@@ -336,19 +234,18 @@ export default function OptionCard({
     {
       key: "uncertainty",
       icon: <HelpCircle size={14} />,
-      label: "Service uncertainty",
-      value: titleCase(su.uncertainty_label),
-      sub:
+      label: "Service Reliability",
+      value:
         su.uncertainty_score_pct != null
-          ? `Composite ${Math.round(su.uncertainty_score_pct)} / 100`
-          : undefined,
+          ? `${Math.round(su.uncertainty_score_pct)}%`
+          : titleCase(su.uncertainty_label),
       tone: toneByScore(su.uncertainty_score_pct),
       source: "service_uncertainty",
     },
     {
       key: "recovery",
       icon: <LifeBuoy size={14} />,
-      label: "Recovery time",
+      label: "Backup Options",
       value: recoveryDisplay.value,
       sub: recoveryDisplay.sub,
       tone: recoveryDisplay.tone,
@@ -357,12 +254,11 @@ export default function OptionCard({
     {
       key: "safety",
       icon: <AlertTriangle size={14} />,
-      label: "Safety exposure",
-      value: titleCase(se.exposure_label),
-      sub:
+      label: "Route Exposure",
+      value:
         se.safety_exposure_pct != null
-          ? `Corridor index ${Math.round(se.safety_exposure_pct)} / 100`
-          : undefined,
+          ? `${Math.round(se.safety_exposure_pct)}%`
+          : titleCase(se.exposure_label),
       tone: toneByScore(se.safety_exposure_pct),
       source: "safety_exposure",
     },
@@ -398,27 +294,24 @@ export default function OptionCard({
               }}
               title={`Source: ${m.source}`}
             >
-              <div className="flex items-center gap-2">
-                <span className="option-metric-icon">{m.icon}</span>
-                <div className="min-w-0">
+              <div className="option-metric-inner">
+                <div className="text-sm font-semibold truncate option-metric-label">
+                  {m.label}
+                </div>
+                <div className="option-metric-value-row">
+                  <span className="option-metric-icon">{m.icon}</span>
+                  <span className="text-sm font-semibold truncate">
+                    {m.value}
+                  </span>
+                </div>
+                {m.sub && (
                   <div
                     className="text-xs truncate"
                     style={{ color: "var(--text-muted)" }}
                   >
-                    {m.label}
+                    {m.sub}
                   </div>
-                  <div className="text-sm font-medium truncate">
-                    {m.value}
-                  </div>
-                  {m.sub && (
-                    <div
-                      className="text-[10px] truncate"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      {m.sub}
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
             </div>
           );

@@ -55,17 +55,21 @@ const CARDS = [
 ];
 
 const FUTURE_ITEMS = [
-  "Run user testing with different night-time travellers.",
-  "Add richer local support and accessibility data.",
-  "Compare more route types and borough conditions.",
-  "Explore how different users weigh the same journey differently.",
+  "Test the prototype with different night-time travellers.",
+  "Add richer local support, accessibility, and lighting data.",
+  "Compare more route types, departure times, and borough contexts.",
+  "Explore how different users weigh waiting, safety, cost, and backup options differently.",
 ];
 
 const DATA_SOURCES = [
-  "Police approximation",
-  "Timetable proxy",
-  "HSDS footfall",
-  "NHS machine check",
+  { name: "TfL Unified API", url: "https://api.tfl.gov.uk/" },
+  { name: "OpenStreetMap", url: "https://www.openstreetmap.org/" },
+  { name: "NHS APIs", url: "https://digital.nhs.uk/developer/api-catalogue" },
+  { name: "BHF The Circuit", url: "https://www.thecircuit.uk/" },
+  { name: "data.police.uk", url: "https://data.police.uk/" },
+  { name: "GLA London Datastore", url: "https://data.london.gov.uk/" },
+  { name: "NASA Black Marble", url: "https://blackmarble.gsfc.nasa.gov/" },
+  { name: "NaPTAN / DfT", url: "https://www.data.gov.uk/dataset/ff93ffc1-6656-47d8-9155-85ea0b8f2251/national-public-transport-access-nodes-naptan" },
 ];
 
 export default function ReflectionPage() {
@@ -76,7 +80,7 @@ export default function ReflectionPage() {
 
       {/* Title */}
       <div className="refl-header">
-        <h1 className="refl-title">Reflection / Design Limits</h1>
+        <h1 className="refl-title">Reflection &amp; Limits</h1>
       </div>
 
       {/* 2×2 card grid */}
@@ -103,7 +107,7 @@ export default function ReflectionPage() {
         <div className="refl-future-icon" style={{ color: "var(--text-secondary)" }}>
           <Clock size={20} />
         </div>
-        <h2 className="refl-future-title">If there were more time</h2>
+        <h2 className="refl-future-title">Future Improvements</h2>
         <ul className="refl-card-list">
           {FUTURE_ITEMS.map((item, i) => (
             <li key={i}>{item}</li>
@@ -113,19 +117,25 @@ export default function ReflectionPage() {
 
       {/* Closing quote */}
       <blockquote className="refl-quote">
-        The goal is not to declare the city safe or unsafe. It is to show how
-        support, waiting, and recovery change after dark — and why that matters.
+        &ldquo;The goal is not to label the city as safe or unsafe. It is to show how
+        waiting, support, reliability, and recovery change after dark&nbsp;&mdash; and why those changes matter.&rdquo;
       </blockquote>
 
-      {/* Footer: Author & Data Sources */}
+      {/* Footer: Data Sources */}
       <div className="refl-footer">
         <div className="refl-footer-inner">
-          <h3 className="refl-footer-title">Author &amp; Data Sources</h3>
+          <h3 className="refl-footer-title">Data Sources</h3>
           <div className="refl-footer-sources">
             {DATA_SOURCES.map((s) => (
-              <span key={s} className="refl-footer-item">
-                &bull;&ensp;{s}
-              </span>
+              <a
+                key={s.name}
+                href={s.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="refl-footer-link"
+              >
+                {s.name}
+              </a>
             ))}
           </div>
         </div>
@@ -133,11 +143,11 @@ export default function ReflectionPage() {
 
       {/* Navigation */}
       <div className="refl-nav">
-        <Link href="/ending" className="refl-nav-btn">
-          Final thoughts &rarr;
-        </Link>
         <Link href="/" className="refl-nav-btn refl-nav-secondary">
-          Back to start
+          &larr; Back to start
+        </Link>
+        <Link href="/ending" className="refl-nav-btn">
+          Final thoughts
         </Link>
       </div>
 

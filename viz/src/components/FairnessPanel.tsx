@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   Timer,
   ShieldCheck,
@@ -9,10 +9,13 @@ import {
   Lightbulb,
   Info,
   ChevronDown,
+  Zap,
 } from "lucide-react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { api, type FairnessZone } from "@/lib/api";
+import TimeSlider from "@/components/TimeSlider";
+import { interpolateVitality, formatHour, DAYTIME_SNAPSHOT } from "@/lib/vitality";
 
 const MAPBOX_TOKEN =
   process.env.NEXT_PUBLIC_MAPBOX_TOKEN ||
@@ -20,13 +23,15 @@ const MAPBOX_TOKEN =
 const CENTER: [number, number] = [-0.118, 51.509];
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const GEOJSON_URL = `${BASE_PATH}/london-boroughs.geojson`;
+const N_PTS = 400;
 
 type LayerId =
   | "waiting_burden_increase"
   | "support_access_loss"
   | "recovery_difficulty_increase"
   | "activity_decline"
-  | "low_light_walking_burden";
+  | "low_light_walking_burden"
+  | "city_vitality";
 
 interface LayerDef {
   id: LayerId;
@@ -39,8 +44,16 @@ interface LayerDef {
 
 const LAYERS: LayerDef[] = [
   {
+    id: "city_vitality",
+    label: "City Vitality",
+    icon: <Zap size={14} />,
+    accent: "var(--champagne-gold)",
+    unit: "vitality",
+    description: "Composite City Vitality Index: how service frequency, support access, certainty, and safety decline from day to night.",
+  },
+  {
     id: "waiting_burden_increase",
-    label: "Waiting burden diff",
+    label: "Service Drop",
     icon: <Timer size={14} />,
     accent: "var(--accent-rose)",
     unit: "wait proxy",
@@ -48,7 +61,7 @@ const LAYERS: LayerDef[] = [
   },
   {
     id: "support_access_loss",
-    label: "Support access diff",
+    label: "Support Gap",
     icon: <ShieldCheck size={14} />,
     accent: "var(--accent-emerald)",
     unit: "access gap",
@@ -56,7 +69,7 @@ const LAYERS: LayerDef[] = [
   },
   {
     id: "recovery_difficulty_increase",
-    label: "Recovery difficulty",
+    label: "Recovery Difficulty",
     icon: <Route size={14} />,
     accent: "var(--champagne-gold)",
     unit: "difficulty",
@@ -64,7 +77,7 @@ const LAYERS: LayerDef[] = [
   },
   {
     id: "activity_decline",
-    label: "Activity decline",
+    label: "Activity Loss",
     icon: <Activity size={14} />,
     accent: "var(--accent-amber)",
     unit: "activity gap",
@@ -72,7 +85,7 @@ const LAYERS: LayerDef[] = [
   },
   {
     id: "low_light_walking_burden",
-    label: "Low-support walking exposure",
+    label: "Low-Support Exposure",
     icon: <Lightbulb size={14} />,
     accent: "var(--champagne-gold)",
     unit: "exposure proxy",
@@ -82,72 +95,57 @@ const LAYERS: LayerDef[] = [
 
 const SCORE_GUIDE: Array<{
   id: LayerId;
-  title: string;
-  score: string;
-  reference: string;
-  value: string;
+  aboutHeading: string;
+  body: string;
+  higherLine: string;
 }> = [
   {
+    id: "city_vitality",
+    aboutHeading: "About City Vitality",
+    body: "A combined score showing how supported a borough feels at night. It brings together public transport service, nearby support places, service certainty, and safety context across representative routes.",
+    higherLine: "Higher score = stronger night-time support.",
+  },
+  {
     id: "waiting_burden_increase",
-    title: "Waiting burden diff",
-    score: "Percentile rank of relative decline in waiting-support places such as pubs, licensed food, takeaway and small pubs.",
-    reference: "Normalised 2001 borough presence for those waiting-support categories.",
-    value: "Normalised 2017 borough presence for the same categories.",
+    aboutHeading: "About Service Drop",
+    body: "Shows how much public transport service becomes weaker at night. A higher score means services are less frequent, waiting may be longer, and the area may feel harder to move through after dark.",
+    higherLine: "Higher score = bigger night-time service drop.",
   },
   {
     id: "support_access_loss",
-    title: "Support access diff",
-    score: "Percentile rank of max(0, activity need rank - support availability rank).",
-    reference: "Borough night activity need rank from NTE, pubs, nightlife, nightclub and cultural POI counts.",
-    value: "Borough support availability rank from licensed food, clubs, grassroots music, LGBT venues and nightlife POIs.",
+    aboutHeading: "About Support Gap",
+    body: "Shows where night-time activity is higher than the support available nearby. A higher score means people may be out at night, but there are fewer open places such as shops, food places, pubs, or other support points.",
+    higherLine: "Higher score = larger gap between need and support.",
   },
   {
     id: "recovery_difficulty_increase",
-    title: "Recovery difficulty",
-    score: "Percentile rank of a composite recovery difficulty score.",
-    reference: "Inverse of the composite difficulty score, used as a low-difficulty reference.",
-    value: "Composite of support access diff, waiting burden diff and night activity need.",
+    aboutHeading: "About Recovery Difficulty",
+    body: "Shows how hard it may be to recover if a journey goes wrong. A higher score means fewer backup options, longer waits, or more difficulty finding another workable route.",
+    higherLine: "Higher score = harder to recover.",
   },
   {
     id: "activity_decline",
-    title: "Activity decline",
-    score: "Percentile rank of relative decline in night-time economy and activity categories.",
-    reference: "Normalised 2001 borough activity footprint.",
-    value: "Normalised 2017 borough activity footprint.",
+    aboutHeading: "About Activity Loss",
+    body: "Shows how much night-time activity has declined compared with the daytime or historical activity pattern. A higher score means the area becomes quieter, with fewer active places and less street-level activity.",
+    higherLine: "Higher score = stronger activity decline.",
   },
   {
     id: "low_light_walking_burden",
-    title: "Low-support walking exposure",
-    score: "Composite proxy combining borough visibility context with weak late-night support.",
-    reference: "Relative low-exposure reference for the composite proxy.",
-    value: "Relative exposure value from visibility and support weakness inputs.",
+    aboutHeading: "About Exposed Walking",
+    body: "Shows where people may need to walk through areas with weaker late-night support. A higher score means the area has fewer open places, weaker visible support, or a less active street environment after dark.",
+    higherLine: "Higher score = more exposed walking context.",
   },
 ];
-
-const INNER_BOROUGHS = new Set([
-  "Camden", "City of London", "Greenwich", "Hackney", "Hammersmith and Fulham",
-  "Islington", "Kensington and Chelsea", "Lambeth", "Lewisham", "Newham",
-  "Southwark", "Tower Hamlets", "Wandsworth", "Westminster",
-]);
 
 function dropColor(ratio: number, min = 0, max = 0.8): string {
   const span = Math.max(max - min, 0.001);
   const t = Math.min(Math.max((Math.abs(ratio) - min) / span, 0), 1);
-  const r = Math.round(50 + t * 151);
-  const g = Math.round(48 + t * 121);
-  const b = Math.round(60 + t * 50);
+  const r = Math.round(240 - t * 166);
+  const g = Math.round(184 - t * 126);
+  const b = Math.round(122 + t * 0);
   return `rgb(${r},${g},${b})`;
 }
 
-function dropLabel(drop: number): { text: string; color: string } {
-  const abs = Math.abs(drop);
-  if (abs >= 0.7) return { text: "Large gap", color: "var(--accent-amber)" };
-  if (abs >= 0.4) return { text: "Notable gap", color: "var(--champagne-gold)" };
-  if (abs >= 0.15) return { text: "Moderate gap", color: "var(--text-secondary)" };
-  return { text: "Minimal change", color: "var(--accent-emerald)" };
-}
-
-/** Extract borough name from MSOA name (e.g. "Camden 016" → "camden") */
 function extractBorough(msoaName: string): string {
   const trimmed = msoaName.trim();
   const parts = trimmed.split(/\s+/);
@@ -157,7 +155,6 @@ function extractBorough(msoaName: string): string {
   return trimmed.toLowerCase();
 }
 
-/** Aggregate MSOA zones to borough level, then merge into GeoJSON */
 function mergeGeoWithZones(
   geo: GeoJSON.FeatureCollection,
   zoneData: Record<string, FairnessZone>,
@@ -203,10 +200,39 @@ function mergeGeoWithZones(
 
 const EMPTY_FC: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
 
+/* ── Vitality GeoJSON (point cloud) ── */
+
+function sr(i: number, s = 0) {
+  const x = Math.sin((i + s) * 127.1 + 311.7) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+function buildVitalityGeoJSON(): GeoJSON.FeatureCollection {
+  const features: GeoJSON.Feature[] = [];
+  for (let i = 0; i < N_PTS; i++) {
+    const angle = sr(i) * Math.PI * 2;
+    const dist = Math.sqrt(-2 * Math.log(Math.max(sr(i, 50), 0.001))) * 0.07;
+    const threshold = sr(i, 100);
+    features.push({
+      type: "Feature",
+      properties: { t: threshold },
+      geometry: {
+        type: "Point",
+        coordinates: [
+          CENTER[0] + Math.cos(angle) * dist * 1.6,
+          CENTER[1] + Math.sin(angle) * dist,
+        ],
+      },
+    });
+  }
+  return { type: "FeatureCollection", features };
+}
+
 /* ── Main component ── */
 
 export default function FairnessPanel() {
-  const [activeLayer, setActiveLayer] = useState<LayerId>("support_access_loss");
+  const [activeLayer, setActiveLayer] = useState<LayerId>("city_vitality");
+  const [hour, setHour] = useState(9);
   const [showScoreGuide, setShowScoreGuide] = useState(false);
   const [zones, setZones] = useState<Record<string, FairnessZone>>({});
   const [fetchedLayer, setFetchedLayer] = useState<string>("");
@@ -215,7 +241,13 @@ export default function FairnessPanel() {
   const readyRef = useRef(false);
   const geoRef = useRef<GeoJSON.FeatureCollection | null>(null);
   const zonesRef = useRef<Record<string, FairnessZone>>({});
-  const loading = activeLayer !== fetchedLayer;
+  const vitalityGeoJSON = useMemo(() => buildVitalityGeoJSON(), []);
+
+  const isVitality = activeLayer === "city_vitality";
+  const loading = !isVitality && activeLayer !== fetchedLayer;
+
+  const snap = interpolateVitality(hour);
+  const day = DAYTIME_SNAPSHOT;
 
   useEffect(() => { zonesRef.current = zones; }, [zones]);
 
@@ -227,7 +259,7 @@ export default function FairnessPanel() {
     src.setData(mergeGeoWithZones(geoRef.current, zonesRef.current));
   }, []);
 
-  /* Fetch GeoJSON once */
+  /* Fetch borough GeoJSON once */
   useEffect(() => {
     fetch(GEOJSON_URL)
       .then((r) => r.json())
@@ -238,8 +270,9 @@ export default function FairnessPanel() {
       .catch(() => {});
   }, [updateChoropleth]);
 
-  /* Fetch layer data */
+  /* Fetch choropleth layer data (skip for city_vitality) */
   useEffect(() => {
+    if (isVitality) { setFetchedLayer("city_vitality"); return; }
     let stale = false;
     api
       .getFairnessLayer(activeLayer)
@@ -253,13 +286,42 @@ export default function FairnessPanel() {
         if (!stale) { setZones({}); setFetchedLayer(activeLayer); }
       });
     return () => { stale = true; };
-  }, [activeLayer]);
+  }, [activeLayer, isVitality]);
 
   useEffect(() => {
     updateChoropleth();
   }, [zones, updateChoropleth]);
 
-  /* Initialize map (once, no dependency on data) */
+  /* ── Apply vitality theme to map ── */
+  const applyVitality = useCallback((m: mapboxgl.Map, h: number, density: number, color: string) => {
+    const labelOp = h <= 18 ? 0.7 : h <= 21 ? 0.7 - ((h - 18) / 3) * 0.15 : 0.55 - ((h - 21) / 4) * 0.1;
+
+    for (const l of m.getStyle()?.layers ?? []) {
+      if (l.type === "symbol" && (l.id.includes("label") || l.id.includes("place")))
+        m.setPaintProperty(l.id, "text-opacity", labelOp);
+    }
+
+    if (m.getLayer("pts-vitality")) {
+      m.setFilter("pts-vitality", ["<=", ["get", "t"], density]);
+      m.setPaintProperty("pts-vitality", "circle-color", color);
+      m.setPaintProperty("pts-vitality", "circle-opacity", 0.5 + density * 0.45);
+    }
+    if (m.getLayer("pts-glow")) {
+      m.setFilter("pts-glow", ["<=", ["get", "t"], density]);
+      m.setPaintProperty("pts-glow", "circle-color", color);
+      m.setPaintProperty("pts-glow", "circle-opacity", 0.15 + (h > 21 ? 0.12 : 0));
+    }
+  }, []);
+
+  /* ── Reset map theme (when leaving vitality) ── */
+  const resetMapTheme = useCallback((m: mapboxgl.Map) => {
+    for (const l of m.getStyle()?.layers ?? []) {
+      if (l.type === "symbol" && (l.id.includes("label") || l.id.includes("place")))
+        m.setPaintProperty(l.id, "text-opacity", 1);
+    }
+  }, []);
+
+  /* ── Initialize map ── */
   useEffect(() => {
     const el = mapContainerRef.current;
     if (!el || !MAPBOX_TOKEN) return;
@@ -273,7 +335,7 @@ export default function FairnessPanel() {
     mapboxgl.accessToken = MAPBOX_TOKEN;
     const m = new mapboxgl.Map({
       container: el,
-      style: "mapbox://styles/mapbox/dark-v11",
+      style: "mapbox://styles/mapbox/light-v11",
       center: CENTER,
       zoom: 9.3,
       interactive: true,
@@ -281,54 +343,115 @@ export default function FairnessPanel() {
     });
     mapRef.current = m;
 
+    // 3. Scale bar (bottom — added first, stacks at bottom)
+    const scaleCtrl = new mapboxgl.ScaleControl({ maxWidth: 120, unit: "metric" });
+    m.addControl(scaleCtrl, "bottom-left");
+    const scaleEl = (scaleCtrl as unknown as { _container?: HTMLElement })._container;
+    if (scaleEl) {
+      const fixLang = () => {
+        const txt = scaleEl.textContent || "";
+        const fixed = txt.replace(/公里/, "km").replace(/米/, "m");
+        if (fixed !== txt) scaleEl.textContent = fixed;
+      };
+      fixLang();
+      new MutationObserver(fixLang).observe(scaleEl, { childList: true, characterData: true, subtree: true });
+    }
+
+    // 2. Home / reset view (middle)
+    class HomeControl implements mapboxgl.IControl {
+      _container?: HTMLElement;
+      onAdd() {
+        const btn = document.createElement("button");
+        btn.className = "fairness-home-ctrl";
+        btn.type = "button";
+        btn.title = "Reset view";
+        btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="1"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>`;
+        btn.addEventListener("click", () => {
+          mapRef.current?.flyTo({ center: CENTER, zoom: 9.3, pitch: 0, bearing: 0, duration: 800 });
+        });
+        const div = document.createElement("div");
+        div.className = "mapboxgl-ctrl mapboxgl-ctrl-group";
+        div.appendChild(btn);
+        this._container = div;
+        return div;
+      }
+      onRemove() { this._container?.remove(); }
+    }
+    m.addControl(new HomeControl(), "bottom-left");
+
+    // 1. Compass (top — added last, stacks at top)
+    m.addControl(new mapboxgl.NavigationControl({ showCompass: true, showZoom: false }), "bottom-left");
+
     m.on("load", () => {
       if (mapRef.current !== m) return;
       m.resize();
 
+      // Fade base map layers, keep custom layers at full opacity
+      const BASE_OPACITY = 0.45;
+      for (const l of m.getStyle()?.layers ?? []) {
+        try {
+          if (l.type === "background")
+            m.setPaintProperty(l.id, "background-opacity", BASE_OPACITY);
+          else if (l.type === "fill" && !l.id.startsWith("borough"))
+            m.setPaintProperty(l.id, "fill-opacity", BASE_OPACITY);
+          else if (l.type === "line" && !l.id.startsWith("borough"))
+            m.setPaintProperty(l.id, "line-opacity", BASE_OPACITY);
+          else if (l.type === "symbol")
+            m.setPaintProperty(l.id, "text-opacity", BASE_OPACITY + 0.15);
+        } catch { /* ok */ }
+        if (l.type === "symbol") {
+          try { m.setPaintProperty(l.id, "text-opacity-transition", { duration: 600 }); } catch { /* ok */ }
+        }
+      }
+
+      // Choropleth layers
       const initData = geoRef.current
         ? mergeGeoWithZones(geoRef.current, zonesRef.current)
         : EMPTY_FC;
 
       m.addSource("boroughs", { type: "geojson", data: initData });
-
       m.addLayer({
-        id: "borough-fills",
-        type: "fill",
-        source: "boroughs",
+        id: "borough-fills", type: "fill", source: "boroughs",
+        layout: { visibility: "none" },
         paint: {
           "fill-color": ["coalesce", ["get", "fill_color"], "rgba(40,50,90,0.5)"],
           "fill-opacity": 0.75,
         },
       });
       m.addLayer({
-        id: "borough-borders",
-        type: "line",
-        source: "boroughs",
+        id: "borough-borders", type: "line", source: "boroughs",
+        layout: { visibility: "none" },
+        paint: { "line-color": "rgba(200,200,220,0.25)", "line-width": 1 },
+      });
+
+      // Vitality point layers
+      m.addSource("vp", { type: "geojson", data: vitalityGeoJSON });
+      m.addLayer({
+        id: "pts-glow", type: "circle", source: "vp",
         paint: {
-          "line-color": "rgba(200,200,220,0.25)",
-          "line-width": 1,
+          "circle-radius": 14, "circle-color": "#d4944a",
+          "circle-opacity": 0, "circle-opacity-transition": { duration: 600 },
+          "circle-blur": 1,
+        },
+      });
+      m.addLayer({
+        id: "pts-vitality", type: "circle", source: "vp",
+        paint: {
+          "circle-radius": 4, "circle-color": "#d4944a",
+          "circle-opacity": 0.85, "circle-opacity-transition": { duration: 600 },
         },
       });
 
-      const popup = new mapboxgl.Popup({
-        closeButton: false,
-        closeOnClick: false,
-        className: "fairness-popup",
-      });
+      // Borough popup
+      const popup = new mapboxgl.Popup({ closeButton: false, closeOnClick: false, className: "fairness-popup" });
       m.on("mousemove", "borough-fills", (e) => {
         m.getCanvas().style.cursor = "pointer";
         const props = e.features?.[0]?.properties;
         if (props) {
-          const drop = (props.drop_ratio * 100).toFixed(0);
-          const value = (Number(props.night_value) * 100).toFixed(0);
-          const reference = (Number(props.day_value) * 100).toFixed(0);
-          popup
-            .setLngLat(e.lngLat)
-            .setHTML(
-              `<strong>${props.name}</strong><br/>` +
-              `Score: ${drop}% &middot; Reference: ${reference}% &middot; Value: ${value}%`
-            )
-            .addTo(m);
+          popup.setLngLat(e.lngLat).setHTML(
+            `<strong>${props.name}</strong><br/>` +
+            `Score: ${(props.drop_ratio * 100).toFixed(0)}% &middot; Reference: ${(Number(props.day_value) * 100).toFixed(0)}% &middot; Value: ${(Number(props.night_value) * 100).toFixed(0)}%`
+          ).addTo(m);
         }
       });
       m.on("mouseleave", "borough-fills", () => {
@@ -337,78 +460,58 @@ export default function FairnessPanel() {
       });
 
       readyRef.current = true;
+
+      // Apply vitality theme immediately so the map starts yellow
+      const initSnap = interpolateVitality(9);
+      applyVitality(m, 9, initSnap.density, initSnap.color);
     });
 
     return () => {
       m.remove();
-      if (mapRef.current === m) {
-        mapRef.current = null;
-        readyRef.current = false;
-      }
+      if (mapRef.current === m) { mapRef.current = null; readyRef.current = false; }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* Aggregate MSOA zones → borough-level entries for UI display */
-  const boroughMap: Record<string, { name: string; day: number; night: number; drop: number; count: number }> = {};
-  for (const z of Object.values(zones)) {
-    const borough = extractBorough(z.name);
-    const proper = z.name.replace(/\s+\d{3}$/, "");
-    if (!boroughMap[borough]) {
-      boroughMap[borough] = { name: proper, day: 0, night: 0, drop: 0, count: 0 };
+  /* ── Toggle layer visibility ── */
+  useEffect(() => {
+    const m = mapRef.current;
+    if (!m || !readyRef.current) return;
+
+    const showChoropleth = !isVitality;
+    if (m.getLayer("borough-fills"))
+      m.setLayoutProperty("borough-fills", "visibility", showChoropleth ? "visible" : "none");
+    if (m.getLayer("borough-borders"))
+      m.setLayoutProperty("borough-borders", "visibility", showChoropleth ? "visible" : "none");
+    if (m.getLayer("pts-vitality"))
+      m.setLayoutProperty("pts-vitality", "visibility", isVitality ? "visible" : "none");
+    if (m.getLayer("pts-glow"))
+      m.setLayoutProperty("pts-glow", "visibility", isVitality ? "visible" : "none");
+
+    if (isVitality) {
+      applyVitality(m, hour, snap.density, snap.color);
+    } else {
+      resetMapTheme(m);
     }
-    const b = boroughMap[borough];
-    b.day += z.day_value;
-    b.night += z.night_value;
-    b.drop += z.drop_ratio;
-    b.count += 1;
-  }
-  const aggregatedZones: [string, FairnessZone][] = Object.entries(boroughMap).map(
-    ([key, b]) => [
-      key,
-      {
-        name: b.name,
-        day_value: b.day / b.count,
-        night_value: b.night / b.count,
-        drop_ratio: b.drop / b.count,
-        percentile: 0,
-      },
-    ],
-  );
-  const sortedZones = aggregatedZones.sort(
-    ([, a], [, b]) => Math.abs(b.drop_ratio) - Math.abs(a.drop_ratio),
-  );
-  const maxZoneDrop = Math.max(
-    ...sortedZones.map(([, z]) => Math.abs(z.drop_ratio)),
-    0.001,
-  );
-  const innerZones = sortedZones.filter(([, z]) => INNER_BOROUGHS.has(z.name));
-  const outerZones = sortedZones.filter(([, z]) => !INNER_BOROUGHS.has(z.name));
+  }, [activeLayer, isVitality, hour, snap.density, snap.color, applyVitality, resetMapTheme]);
+
+  /* ── Vitality time update ── */
+  useEffect(() => {
+    const m = mapRef.current;
+    if (!m || !readyRef.current || !isVitality) return;
+    applyVitality(m, hour, snap.density, snap.color);
+  }, [hour, snap.density, snap.color, isVitality, applyVitality]);
+
   const activeLayerDef = LAYERS.find((l) => l.id === activeLayer);
   const activeGuide = SCORE_GUIDE.find((item) => item.id === activeLayer);
 
   return (
-    <div className="fairness-page-wrap">
-      {/* ── Title ── */}
-      <div className="fairness-hero">
-        <p className="section-label">City-wide Fairness &middot; Mobility Support Inequality</p>
-        <h1 className="fairness-hero-title">
-          Where Does the Day-to-Night Gap{" "}
-          <span style={{ color: "var(--accent-amber)" }}>Widen Most?</span>
-        </h1>
-        <p className="fairness-hero-sub">
-          Which areas are more likely to lose high-support public transport
-          experience at night?
-        </p>
-        <p className="fairness-hero-note">
-          This page compares the relative drop from day to night — not absolute
-          night-time values. A large drop means the gap between daytime and
-          night-time experience is wider.
-        </p>
-      </div>
+    <div className="fairness-page-wrap fullscreen-mode">
 
-      {/* ── Map section: sidebar + map ── */}
-      <div className="fairness-map-section">
-        <div className="fairness-sidebar">
+      {/* ── Map section (always fullscreen) ── */}
+      <div className="fairness-map-section map-fullscreen">
+        {/* Sidebar (always floating) */}
+        <div className="fairness-sidebar sidebar-float">
           {LAYERS.map((l) => {
             const isActive = activeLayer === l.id;
             return (
@@ -436,44 +539,31 @@ export default function FairnessPanel() {
             );
           })}
 
-          <div className="fairness-score-guide">
-            <button
-              type="button"
-              className={`fairness-score-guide-toggle ${showScoreGuide ? "active" : ""}`}
-              onClick={() => setShowScoreGuide((open) => !open)}
-              aria-expanded={showScoreGuide}
-              style={showScoreGuide && activeLayerDef ? {
-                borderColor: activeLayerDef.accent,
-                color: activeLayerDef.accent,
-              } : undefined}
-            >
-              <span
-                className="fairness-score-guide-dot"
-                style={{
-                  borderColor: showScoreGuide && activeLayerDef ? activeLayerDef.accent : "var(--text-muted)",
-                  background: showScoreGuide && activeLayerDef ? activeLayerDef.accent : "transparent",
-                }}
+          {activeGuide && (
+            <div className="fairness-score-guide">
+              <button
+                type="button"
+                className={`fairness-score-guide-toggle ${showScoreGuide ? "active" : ""}`}
+                onClick={() => setShowScoreGuide((open) => !open)}
+                aria-expanded={showScoreGuide}
               >
-                <Info size={10} />
-              </span>
-              <span>Score guide: {activeLayerDef?.label || "Current map"}</span>
-              <ChevronDown
-                size={14}
-                className={showScoreGuide ? "fairness-score-guide-chevron open" : "fairness-score-guide-chevron"}
-              />
-            </button>
+                <Info size={12} className="fairness-score-guide-icon" />
+                <span className="fairness-score-guide-title">Score guide: {activeLayerDef?.label}</span>
+                <ChevronDown
+                  size={12}
+                  className={showScoreGuide ? "fairness-score-guide-chevron open" : "fairness-score-guide-chevron"}
+                />
+              </button>
 
-            {showScoreGuide && activeGuide && (
-              <div key={activeLayer} className="fairness-score-guide-panel">
-                <section className="fairness-score-guide-item">
-                  <h3>{activeGuide.title}</h3>
-                  <p><strong>Score</strong>: {activeGuide.score}</p>
-                  <p><strong>Reference</strong>: {activeGuide.reference}</p>
-                  <p><strong>Value</strong>: {activeGuide.value}</p>
-                </section>
-              </div>
-            )}
-          </div>
+              {showScoreGuide && (
+                <div key={activeLayer} className="fairness-score-guide-panel">
+                  <p className="fairness-score-guide-heading">{activeGuide.aboutHeading}</p>
+                  <p className="fairness-score-guide-body">{activeGuide.body}</p>
+                  <p className="fairness-score-guide-higher">{activeGuide.higherLine}</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="fairness-map-area">
@@ -485,19 +575,56 @@ export default function FairnessPanel() {
             </div>
           )}
 
-          <div className="fairness-legend">
-            <span className="fairness-legend-title">
-              Layer intensity [low &rarr; high]
-            </span>
-            <div className="fairness-legend-bar" />
-            <div className="fairness-legend-labels">
-              <span>0%</span>
-              <span>20%</span>
-              <span>40%</span>
-              <span>60%</span>
-              <span>80%</span>
+          {/* Vitality: TimeSlider overlay */}
+          {isVitality && (
+            <div className="fairness-vitality-slider">
+              <TimeSlider hour={hour} onChange={setHour} color={snap.color} />
             </div>
-          </div>
+          )}
+
+          {/* Vitality: bottom stats overlay */}
+          {isVitality && (
+            <div className="fairness-vitality-foot">
+              <div className="ov2-bar glow">
+                <div className="ov2-vitality-hero">
+                  <span className="ov2-vitality-label">City Vitality</span>
+                  <span className="ov2-vitality-val" style={{ color: snap.color }}>
+                    {Math.round(snap.density * 100)}%
+                  </span>
+                </div>
+                <div className="ov2-sep" />
+                <VitalityBar label="Service level" value={snap.components.service_freq} base={day.components.service_freq} color={snap.color} />
+                <VitalityBar label="Support" value={snap.components.support_access} base={day.components.support_access} color={snap.color} />
+                <VitalityBar label="Certainty" value={snap.components.certainty} base={day.components.certainty} color={snap.color} />
+                <VitalityBar label="Safety" value={snap.components.safety} base={day.components.safety} color={snap.color} />
+              </div>
+              <p className="ov2-quote">
+                {formatHour(hour)} &mdash;{" "}
+                {snap.density >= 0.85
+                  ? "The city is alive — services run frequently, support is everywhere."
+                  : snap.density >= 0.6
+                    ? "Services are thinning. Shops close, headways stretch, support fades."
+                    : "The city has emptied. Long waits, few options, little support nearby."}
+              </p>
+            </div>
+          )}
+
+          {/* Choropleth: legend */}
+          {!isVitality && (
+            <div className="fairness-legend">
+              <span className="fairness-legend-title">
+                Layer intensity [low &rarr; high]
+              </span>
+              <div className="fairness-legend-bar" />
+              <div className="fairness-legend-labels">
+                <span>0%</span>
+                <span>20%</span>
+                <span>40%</span>
+                <span>60%</span>
+                <span>80%</span>
+              </div>
+            </div>
+          )}
 
           {loading && (
             <div className="fairness-map-loading">Loading&hellip;</div>
@@ -505,190 +632,27 @@ export default function FairnessPanel() {
         </div>
       </div>
 
-      {/* ── Ethical disclaimer ── */}
-      <p className="fairness-disclaimer">
-        This map does not indicate safety or danger. It highlights where the gap
-        between daytime and night-time public transport support is largest —
-        areas that may benefit most from targeted service investment.
-      </p>
-
-      {/* ── Bottom: Small Multiples ── */}
-      {!loading && sortedZones.length > 0 && (
-        <div className="fairness-sm-row">
-          <SmallMultipleChart
-            title="Small Multiples: Inner vs Outer Layer Gap"
-            innerZones={innerZones}
-            outerZones={outerZones}
-            legendLabels={["Inner London", "Peripheral London"]}
-          />
-          <SmallMultipleChart
-            title="Small Multiples: Region-Type Layer Gap"
-            innerZones={innerZones}
-            outerZones={outerZones}
-            legendLabels={["Region-type-specific", "Region performance"]}
-          />
-        </div>
-      )}
-
-      {/* ── Inner vs Outer comparison ── */}
-      {!loading && sortedZones.length > 0 && (
-        <div className="fairness-bottom-section">
-          <div className="fairness-comparison">
-            <ZoneGroup title="Inner London" zones={innerZones} />
-            <ZoneGroup title="Outer London" zones={outerZones} />
-          </div>
-
-          <div className="fairness-rank">
-            <h4 className="fairness-rank-title">Layer intensity by area</h4>
-            <div className="fairness-bars">
-              {sortedZones.slice(0, 15).map(([code, zone]) => {
-                const abs = Math.abs(zone.drop_ratio);
-                const barWidth = Math.min((abs / maxZoneDrop) * 100, 100);
-                const dl = dropLabel(zone.drop_ratio);
-                return (
-                  <div key={code} className="fairness-bar-row">
-                    <span className="fairness-bar-name">{zone.name}</span>
-                    <div className="fairness-bar-track">
-                      <div
-                        className="fairness-bar-fill"
-                        style={{ width: `${barWidth}%`, background: dl.color }}
-                      />
-                    </div>
-                    <span className="fairness-bar-value" style={{ color: dl.color }}>
-                      {(zone.drop_ratio * 100).toFixed(0)}%
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
-/* ── Zone Group ── */
+/* ── Sub-components ── */
 
-function ZoneGroup({
-  title,
-  zones,
-}: {
-  title: string;
-  zones: [string, FairnessZone][];
+function VitalityBar({ label, value, base, color }: {
+  label: string; value: number; base: number; color: string;
 }) {
-  if (zones.length === 0) return null;
-
-  const avgDay = zones.reduce((s, [, z]) => s + z.day_value, 0) / zones.length;
-  const avgNight = zones.reduce((s, [, z]) => s + z.night_value, 0) / zones.length;
-  const avgDrop = zones.reduce((s, [, z]) => s + z.drop_ratio, 0) / zones.length;
-  const dl = dropLabel(avgDrop);
-
+  const pct = Math.round(value * 100);
+  const change = base === 0 ? 0 : Math.round(((value - base) / base) * 100);
   return (
-    <div className="fairness-group">
-      <h4 className="fairness-group-title">{title}</h4>
-      <div className="fairness-group-stats">
-        <div className="fairness-group-stat">
-          <span className="fairness-group-val">{avgDay.toFixed(1)}</span>
-          <span className="fairness-group-lbl">Reference</span>
-        </div>
-        <span className="fairness-group-arrow">&rarr;</span>
-        <div className="fairness-group-stat">
-          <span className="fairness-group-val">{avgNight.toFixed(1)}</span>
-          <span className="fairness-group-lbl">Layer value</span>
-        </div>
-        <div className="fairness-group-stat">
-          <span className="fairness-group-val" style={{ color: dl.color }}>
-            {(avgDrop * 100).toFixed(0)}%
-          </span>
-          <span className="fairness-group-lbl" style={{ color: dl.color }}>
-            {dl.text}
-          </span>
-        </div>
+    <div className="ov2-vbar">
+      <span className="ov2-vbar-label">{label}</span>
+      <div className="ov2-vbar-track">
+        <div className="ov2-vbar-fill" style={{ width: `${pct}%`, background: color, transition: "width 0.5s, background 0.5s" }} />
       </div>
-      <p className="fairness-group-zones">
-        {zones.map(([, z]) => z.name).join(" · ")}
-      </p>
-    </div>
-  );
-}
-
-/* ── Small Multiple Line Chart ── */
-
-function SmallMultipleChart({
-  title,
-  innerZones,
-  outerZones,
-  legendLabels,
-}: {
-  title: string;
-  innerZones: [string, FairnessZone][];
-  outerZones: [string, FairnessZone][];
-  legendLabels: [string, string];
-}) {
-  const W = 360;
-  const H = 180;
-  const PAD = { top: 35, right: 20, bottom: 30, left: 40 };
-
-  const yForScore = (score: number) =>
-    PAD.top + (1 - Math.min(Math.abs(score), 1)) * (H - PAD.top - PAD.bottom);
-
-  const innerPts = innerZones.slice(0, 8).map(([, z], i) => ({
-    x: PAD.left + ((W - PAD.left - PAD.right) * (i + 1)) / 9,
-    y: yForScore(z.drop_ratio),
-  }));
-  const outerPts = outerZones.slice(0, 8).map(([, z], i) => ({
-    x: PAD.left + ((W - PAD.left - PAD.right) * (i + 1)) / 9,
-    y: yForScore(z.drop_ratio),
-  }));
-
-  const makePath = (pts: { x: number; y: number }[]) =>
-    pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
-
-  const yTicks = [0, 25, 50, 75, 100];
-
-  return (
-    <div className="fairness-sm-card">
-      <div className="fairness-sm-header">
-        <h4 className="fairness-sm-title">{title}</h4>
-        <div className="fairness-sm-legend">
-          <span className="fairness-sm-dot" style={{ background: "#d4946a" }} />
-          <span>{legendLabels[0]}</span>
-          <span className="fairness-sm-dot" style={{ background: "#c9a96e" }} />
-          <span>{legendLabels[1]}</span>
-        </div>
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="fairness-sm-svg">
-        {yTicks.map((v) => {
-          const y = PAD.top + (1 - v / 100) * (H - PAD.top - PAD.bottom);
-          return (
-            <g key={v}>
-              <line x1={PAD.left} y1={y} x2={W - PAD.right} y2={y} stroke="rgba(200,200,220,0.1)" />
-              <text x={PAD.left - 6} y={y + 3} textAnchor="end" fill="#6b7194" fontSize="9">
-                {v}
-              </text>
-            </g>
-          );
-        })}
-        <text x={PAD.left + 30} y={H - 8} fill="#6b7194" fontSize="9" textAnchor="middle">Inner</text>
-        <text x={W / 2} y={H - 8} fill="#6b7194" fontSize="9" textAnchor="middle">Area</text>
-        <text x={W - PAD.right - 30} y={H - 8} fill="#6b7194" fontSize="9" textAnchor="middle">Outer</text>
-        <text x={12} y={H / 2} fill="#6b7194" fontSize="9" textAnchor="middle" transform={`rotate(-90,12,${H / 2})`}>
-          Layer Gap
-        </text>
-        {innerPts.length > 1 && (
-          <path d={makePath(innerPts)} fill="none" stroke="#d4946a" strokeWidth="2" opacity="0.85" />
-        )}
-        {outerPts.length > 1 && (
-          <path d={makePath(outerPts)} fill="none" stroke="#c9a96e" strokeWidth="2" opacity="0.85" />
-        )}
-        {innerPts.map((p, i) => (
-          <circle key={`i${i}`} cx={p.x} cy={p.y} r="3" fill="#d4946a" />
-        ))}
-        {outerPts.map((p, i) => (
-          <circle key={`o${i}`} cx={p.x} cy={p.y} r="3" fill="#c9a96e" />
-        ))}
-      </svg>
+      <span className="ov2-vbar-val" style={{ color }}>
+        {pct}%
+        {change < 0 && <span className="ov2-vbar-change">{change}%</span>}
+      </span>
     </div>
   );
 }
