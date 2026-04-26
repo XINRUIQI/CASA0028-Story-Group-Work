@@ -153,6 +153,17 @@ body {
   background-repeat: no-repeat;
 }
 
+.hero-cover::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 180px;
+  background: linear-gradient(to bottom, transparent, #3a2d6a);
+  pointer-events: none;
+}
+
 .hero-stars {
   position: absolute;
   inset: 0;
@@ -260,10 +271,6 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background:
-    radial-gradient(ellipse at 15% 95%, rgba(240, 184, 122, 0.55) 0%, rgba(240, 184, 122, 0) 45%),
-    radial-gradient(ellipse at 85% 85%, rgba(212, 122, 160, 0.45) 0%, rgba(212, 122, 160, 0) 50%),
-    linear-gradient(180deg, #2e2460 0%, #4a3a7a 30%, #8b5a8a 60%, #d98a9a 85%, #f0b080 100%);
 }
 
 .intro-modal-title {
@@ -509,10 +516,6 @@ body {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background:
-    radial-gradient(ellipse at 15% 95%, rgba(240, 184, 122, 0.55) 0%, rgba(240, 184, 122, 0) 45%),
-    radial-gradient(ellipse at 85% 85%, rgba(212, 122, 160, 0.45) 0%, rgba(212, 122, 160, 0) 50%),
-    linear-gradient(180deg, #2e2460 0%, #4a3a7a 30%, #8b5a8a 60%, #d98a9a 85%, #f0b080 100%);
 }
 
 .ctx-map-bg {

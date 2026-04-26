@@ -52,6 +52,13 @@ export default function CustomRouteSelector({
   const [origin, setOrigin] = useState(currentOrigin || "");
   const [destination, setDestination] = useState(currentDestination || "");
 
+  if (currentOrigin && currentOrigin !== origin) {
+    setOrigin(currentOrigin);
+  }
+  if (currentDestination && currentDestination !== destination) {
+    setDestination(currentDestination);
+  }
+
   useEffect(() => {
     if (_manifestCache) return;
     let stale = false;
@@ -62,14 +69,6 @@ export default function CustomRouteSelector({
       stale = true;
     };
   }, []);
-
-  useEffect(() => {
-    if (currentOrigin) setOrigin(currentOrigin);
-  }, [currentOrigin]);
-
-  useEffect(() => {
-    if (currentDestination) setDestination(currentDestination);
-  }, [currentDestination]);
 
   if (!manifest) return null;
 
