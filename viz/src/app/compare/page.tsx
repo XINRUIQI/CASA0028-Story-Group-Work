@@ -157,6 +157,14 @@ function preloadCacheKey(origin: string, dest: string): string {
   return `${origin}__${dest}`;
 }
 
+/* Dense 7-time fallback files exist for the 90 custom OD pairs but NOT for
+   the 4 preset persona routes — fetching them on preset routes just produces
+   harmless 404s in the console. Skip the dense fetch when we know the OD is a
+   preset. */
+function shouldFetchDenseFallback(origin: string, dest: string): boolean {
+  return getPresetPersona(origin, dest) === null;
+}
+
 function preloadOnePersona(
   origin: string,
   dest: string,
@@ -166,9 +174,13 @@ function preloadOnePersona(
   const existing = _preloadPromises.get(key);
   if (existing) return existing;
 
+  const denseFetch = shouldFetchDenseFallback(origin, dest)
+    ? loadStaticCompareCards(origin, dest, [...DENSE_COMPARE_FALLBACK_TIMES])
+    : Promise.resolve(null);
+
   const p = Promise.all([
     loadStaticCompareCards(origin, dest, times),
-    loadStaticCompareCards(origin, dest, [...DENSE_COMPARE_FALLBACK_TIMES]),
+    denseFetch,
   ]).then(([primary, dense]) => {
     const merged = mergeCompareCards(times, primary, [dense]);
     if (!merged) return null;

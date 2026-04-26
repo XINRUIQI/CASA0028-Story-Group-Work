@@ -49,8 +49,20 @@ export default function CustomRouteSelector({
   const [origin, setOrigin] = useState(currentOrigin || "");
   const [destination, setDestination] = useState(currentDestination || "");
 
-  const effectiveOrigin = currentOrigin || origin;
-  const effectiveDestination = currentDestination || destination;
+  /* Sync local state when parent navigates (URL change → new currentOrigin).
+     Without this the parent's prop would silently override every dropdown
+     change because of value-priority logic in earlier versions. */
+  useEffect(() => {
+    if (currentOrigin && currentOrigin !== origin) setOrigin(currentOrigin);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentOrigin]);
+
+  useEffect(() => {
+    if (currentDestination && currentDestination !== destination) {
+      setDestination(currentDestination);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentDestination]);
 
   useEffect(() => {
     if (_manifestCache) return;
@@ -66,14 +78,14 @@ export default function CustomRouteSelector({
   if (!manifest) return null;
 
   const stations = manifest.stations;
-  const originStation = stations.find((s) => s.id === effectiveOrigin);
-  const destStation = stations.find((s) => s.id === effectiveDestination);
+  const originStation = stations.find((s) => s.id === origin);
+  const destStation = stations.find((s) => s.id === destination);
   const canSubmit =
-    effectiveOrigin && effectiveDestination && effectiveOrigin !== effectiveDestination && originStation && destStation;
+    origin && destination && origin !== destination && originStation && destStation;
 
   const handleGo = () => {
     if (!canSubmit) return;
-    onSelect(effectiveOrigin, originStation.name, effectiveDestination, destStation.name);
+    onSelect(origin, originStation.name, destination, destStation.name);
   };
 
   return (
@@ -86,12 +98,12 @@ export default function CustomRouteSelector({
       <div className="custom-route-controls">
         <select
           className="custom-route-select"
-          value={effectiveOrigin}
+          value={origin}
           onChange={(e) => setOrigin(e.target.value)}
         >
           <option value="">Origin…</option>
           {stations.map((s) => (
-            <option key={s.id} value={s.id} disabled={s.id === effectiveDestination}>
+            <option key={s.id} value={s.id} disabled={s.id === destination}>
               {s.name} ({s.zone})
             </option>
           ))}
@@ -101,12 +113,12 @@ export default function CustomRouteSelector({
 
         <select
           className="custom-route-select"
-          value={effectiveDestination}
+          value={destination}
           onChange={(e) => setDestination(e.target.value)}
         >
           <option value="">Destination…</option>
           {stations.map((s) => (
-            <option key={s.id} value={s.id} disabled={s.id === effectiveOrigin}>
+            <option key={s.id} value={s.id} disabled={s.id === origin}>
               {s.name} ({s.zone})
             </option>
           ))}
