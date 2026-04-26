@@ -40,7 +40,7 @@ To get a live page, use **[Deploy to GitHub Pages](.github/workflows/deploy-page
 2. Push to `main` (or run the workflow manually under **Actions → Deploy to GitHub Pages → Run workflow**).
 3. After the deploy job finishes, open **Settings → Pages** again — the site URL is shown (typically `https://<username>.github.io/<repository>/`).
 
-Optional: add a repository **variable** `NEXT_PUBLIC_API_BASE` (**Settings → Secrets and variables → Actions → Variables**) with the public URL of your FastAPI backend. If unset, the built site still loads, but API calls default to `http://localhost:8000` and will not work for visitors until you set a reachable backend URL.
+Optional: add a repository **variable** `NEXT_PUBLIC_API_BASE` (same page) with the public URL of your FastAPI backend if you need live data. If unset, the viz uses **static JSON** under `viz/public/static-data` only and does not call a backend. For local development with a running API, create `viz/.env.local` with e.g. `NEXT_PUBLIC_API_BASE=http://127.0.0.1:8000`.
 
 ## Quick Start
 

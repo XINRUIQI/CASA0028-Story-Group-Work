@@ -5,9 +5,8 @@
 # Setup (one-time):
 #   Repo → Settings → Pages → Build and deployment → Source: "GitHub Actions"
 #
-# Optional:
-#   Repo → Settings → Secrets and variables → Actions → Variables
-#   Add NEXT_PUBLIC_API_BASE = your deployed API URL (e.g. https://your-api.fly.dev)
+# Optional: NEXT_PUBLIC_API_BASE in Actions → Variables = deployed API URL
+#   (only if you need a live backend; otherwise the build uses /static-data only)
 
 name: CI / Deploy
 

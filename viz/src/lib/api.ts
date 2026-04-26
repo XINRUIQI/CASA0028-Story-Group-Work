@@ -1,4 +1,6 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
+/* No default: production / static sites should not hit a backend unless configured. */
+const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || "").trim().replace(/\/$/, "");
+const USE_LIVE_API = API_BASE.length > 0;
 const STATIC_PREFIX = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 /**
@@ -16,11 +18,31 @@ function staticKey(path: string, params?: Record<string, string>): string | null
   return `${dir}/${vals}.json`;
 }
 
+async function fetchStaticJSON<T>(path: string, params?: Record<string, string>): Promise<T> {
+  const key = staticKey(path, params);
+  if (!key) {
+    throw new Error(
+      `No static data key for ${path} (e.g. params too long). Set NEXT_PUBLIC_API_BASE to use a live API.`,
+    );
+  }
+  const res = await fetch(`${STATIC_PREFIX}/static-data/${key}`);
+  if (!res.ok) {
+    throw new Error(
+      `Static data missing: /static-data/${key} (${res.status}). Prefetch the route or set NEXT_PUBLIC_API_BASE.`,
+    );
+  }
+  return res.json();
+}
+
 async function fetchJSON<T>(
   path: string,
   params?: Record<string, string>,
   timeoutMs = 10_000,
 ): Promise<T> {
+  if (!USE_LIVE_API) {
+    return fetchStaticJSON<T>(path, params);
+  }
+
   const url = new URL(path, API_BASE);
   if (params) {
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
@@ -33,9 +55,8 @@ async function fetchJSON<T>(
     const key = staticKey(path, params);
     if (key) {
       try {
-        const fallback = await fetch(`${STATIC_PREFIX}/static-data/${key}`);
-        if (fallback.ok) return fallback.json();
-      } catch { /* static fallback unavailable */ }
+        return await fetchStaticJSON<T>(path, params);
+      } catch { /* will rethrow liveErr */ }
     }
     throw liveErr;
   }

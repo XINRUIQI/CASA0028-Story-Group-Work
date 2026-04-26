@@ -105,7 +105,7 @@ export default function HeroCover() {
         {/* Centre content */}
         <div className={`hero-content ${visible ? "hero-visible" : ""}`}>
           <h1 className="hero-title">
-            <span className="hero-title-line">Day and Night:</span>
+            <span className="hero-title-line">The Same Way Home?</span>
             <span className="hero-subtitle-line">
               How the Same Journey Changes
             </span>
