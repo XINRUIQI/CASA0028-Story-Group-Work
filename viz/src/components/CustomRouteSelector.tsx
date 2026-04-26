@@ -52,13 +52,8 @@ export default function CustomRouteSelector({
   const [origin, setOrigin] = useState(currentOrigin || "");
   const [destination, setDestination] = useState(currentDestination || "");
 
-  useEffect(() => {
-    if (currentOrigin) setOrigin(currentOrigin);
-  }, [currentOrigin]);
-
-  useEffect(() => {
-    if (currentDestination) setDestination(currentDestination);
-  }, [currentDestination]);
+  const effectiveOrigin = currentOrigin || origin;
+  const effectiveDestination = currentDestination || destination;
 
   useEffect(() => {
     if (_manifestCache) return;
@@ -74,14 +69,14 @@ export default function CustomRouteSelector({
   if (!manifest) return null;
 
   const stations = manifest.stations;
-  const originStation = stations.find((s) => s.id === origin);
-  const destStation = stations.find((s) => s.id === destination);
+  const originStation = stations.find((s) => s.id === effectiveOrigin);
+  const destStation = stations.find((s) => s.id === effectiveDestination);
   const canSubmit =
-    origin && destination && origin !== destination && originStation && destStation;
+    effectiveOrigin && effectiveDestination && effectiveOrigin !== effectiveDestination && originStation && destStation;
 
   const handleGo = () => {
     if (!canSubmit) return;
-    onSelect(origin, originStation.name, destination, destStation.name);
+    onSelect(effectiveOrigin, originStation.name, effectiveDestination, destStation.name);
   };
 
   return (
@@ -94,12 +89,12 @@ export default function CustomRouteSelector({
       <div className="custom-route-controls">
         <select
           className="custom-route-select"
-          value={origin}
+          value={effectiveOrigin}
           onChange={(e) => setOrigin(e.target.value)}
         >
           <option value="">Origin…</option>
           {stations.map((s) => (
-            <option key={s.id} value={s.id} disabled={s.id === destination}>
+            <option key={s.id} value={s.id} disabled={s.id === effectiveDestination}>
               {s.name} ({s.zone})
             </option>
           ))}
@@ -109,12 +104,12 @@ export default function CustomRouteSelector({
 
         <select
           className="custom-route-select"
-          value={destination}
+          value={effectiveDestination}
           onChange={(e) => setDestination(e.target.value)}
         >
           <option value="">Destination…</option>
           {stations.map((s) => (
-            <option key={s.id} value={s.id} disabled={s.id === origin}>
+            <option key={s.id} value={s.id} disabled={s.id === effectiveOrigin}>
               {s.name} ({s.zone})
             </option>
           ))}

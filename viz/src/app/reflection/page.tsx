@@ -37,6 +37,7 @@ const CARDS = [
       "Every metric is a proxy — not ground truth.",
       "Coverage and quality vary across datasets.",
       "Night-time data is especially scarce.",
+      "Custom routes are limited to a 10×10 OD matrix due to static hosting on GitHub Pages.",
       "Comparison, not prediction.",
     ],
   },
@@ -59,6 +60,7 @@ const FUTURE_ITEMS = [
   "Add richer local support, accessibility, and lighting data.",
   "Compare more route types, departure times, and borough contexts.",
   "Explore how different users weigh waiting, safety, cost, and backup options differently.",
+  "Incorporate seasonal factors — daylight hours, weather, and holiday schedules.",
 ];
 
 const DATA_SOURCES = [
