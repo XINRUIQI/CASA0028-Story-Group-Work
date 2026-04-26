@@ -251,68 +251,19 @@ body {
 
 /* ── Intro modal: "What changes after dark?" ────────────────── */
 
-.intro-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  overflow-y: auto;
-  scrollbar-gutter: stable;
-  background:
-    radial-gradient(ellipse at 15% 95%, rgba(240, 184, 122, 0.55) 0%, rgba(240, 184, 122, 0) 45%),
-    radial-gradient(ellipse at 85% 85%, rgba(212, 122, 160, 0.45) 0%, rgba(212, 122, 160, 0) 50%),
-    linear-gradient(180deg, #2e2460 0%, #4a3a7a 30%, #8b5a8a 60%, #d98a9a 85%, #f0b080 100%);
-  animation: intro-fade-in 0.35s ease-out;
-}
-
-@keyframes intro-fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.intro-modal {
+.intro-section {
   position: relative;
   width: 100%;
   min-height: 100vh;
-  background: transparent;
-  border: none;
-  border-radius: 0;
   padding: clamp(3rem, 8vh, 5rem) clamp(1.5rem, 6vw, 4rem) clamp(2rem, 5vh, 3rem);
-  box-shadow: none;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  animation: intro-pop-in 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.1);
-}
-
-@keyframes intro-pop-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.intro-modal-close {
-  position: fixed;
-  top: 1.25rem;
-  right: 1.25rem;
-  width: 40px;
-  height: 40px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.15);
-  color: #fef5e8;
-  border: 1px solid rgba(255, 245, 232, 0.35);
-  border-radius: 10px;
-  cursor: pointer;
-  transition: color 0.2s, border-color 0.2s, background 0.2s;
-  z-index: 2;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-}
-.intro-modal-close:hover {
-  color: #fff;
-  border-color: #f0b87a;
-  background: rgba(240, 184, 122, 0.25);
+  background:
+    radial-gradient(ellipse at 15% 95%, rgba(240, 184, 122, 0.55) 0%, rgba(240, 184, 122, 0) 45%),
+    radial-gradient(ellipse at 85% 85%, rgba(212, 122, 160, 0.45) 0%, rgba(212, 122, 160, 0) 50%),
+    linear-gradient(180deg, #2e2460 0%, #4a3a7a 30%, #8b5a8a 60%, #d98a9a 85%, #f0b080 100%);
 }
 
 .intro-modal-title {
@@ -4469,4 +4420,96 @@ body {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   margin-top: auto;
+}
+
+/* ── Custom Route Selector ──────────────────────────────────── */
+
+.custom-route-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--bg-card);
+}
+
+.custom-route-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.custom-route-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.custom-route-select {
+  flex: 1 1 160px;
+  min-width: 140px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 5l3 3 3-3' stroke='%236b7194' fill='none' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  padding-right: 2rem;
+}
+
+.custom-route-select:focus {
+  border-color: var(--champagne-gold);
+}
+
+.custom-route-select option {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.custom-route-select option:disabled {
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+.custom-route-arrow {
+  font-size: 1rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.custom-route-btn {
+  flex-shrink: 0;
+  padding: 0.5rem 1.25rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--bg-primary);
+  background: var(--champagne-gold);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.custom-route-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.custom-route-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
 }

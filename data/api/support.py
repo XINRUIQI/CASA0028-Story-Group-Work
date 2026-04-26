@@ -4,6 +4,7 @@ Data sources: bus shelters, station facilities, OSM POIs, NHS, AED.
 
 Key enhancement: time-aware filtering via opening_hours.
 """
+from __future__ import annotations
 
 import json
 from datetime import datetime

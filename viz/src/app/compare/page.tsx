@@ -13,6 +13,7 @@ import {
   type PersonaId,
 } from "@/components/PersonaSwitch";
 import PersonaInsightsPanel from "@/components/PersonaInsightsPanel";
+import CustomRouteSelector from "@/components/CustomRouteSelector";
 import { useReveal } from "@/lib/useReveal";
 import { type ContextTag, CONTEXT_LABELS } from "@/lib/types";
 import {
@@ -185,14 +186,14 @@ if (typeof window !== "undefined") {
 function getPresetPersona(
   origin?: string | null,
   destination?: string | null,
-): PersonaId {
+): PersonaId | null {
   for (const personaId of Object.keys(PERSONA_ROUTES) as PersonaId[]) {
     const preset = PERSONA_ROUTES[personaId];
     if (preset.origin === origin && preset.dest === destination) {
       return personaId;
     }
   }
-  return "student";
+  return null;
 }
 
 function mapThemeForTime(time: string): "day" | "evening" | "night" {
@@ -250,11 +251,11 @@ function CompareContent() {
 
   const times = timesParam.split(",").filter(Boolean);
   const contexts = contextsParam.split(",").filter(Boolean) as ContextTag[];
-  const [persona, setPersona] = useState<PersonaId>(() =>
-    getPresetPersona(queryOrigin, queryDestination),
+  const [persona, setPersona] = useState<PersonaId | null>(() =>
+    getPresetPersona(queryOrigin, queryDestination) ?? "student",
   );
 
-  const activeRoute = PERSONA_ROUTES[persona];
+  const activeRoute = persona ? PERSONA_ROUTES[persona] : undefined;
   const origin = activeRoute?.origin ?? queryOrigin;
   const originName = activeRoute?.oName ?? queryOriginName;
   const destination = activeRoute?.dest ?? queryDestination;
@@ -279,6 +280,20 @@ function CompareContent() {
     if (nextPersona) setPersona(nextPersona);
   }, []);
 
+  const handleCustomRoute = useCallback(
+    (o: string, oName: string, d: string, dName: string) => {
+      setPersona(null);
+      const params = new URLSearchParams();
+      params.set("origin", o);
+      params.set("originName", oName);
+      params.set("destination", d);
+      params.set("destinationName", dName);
+      params.set("times", "18:00,21:00,23:30");
+      router.push(`/compare?${params.toString()}`);
+    },
+    [router],
+  );
+
   const handleToggleMechanisms = () => {
     setMechanismsOpen((prev) => {
       const next = !prev;
@@ -295,7 +310,8 @@ function CompareContent() {
   };
 
   useEffect(() => {
-    setPersona(getPresetPersona(queryOrigin, queryDestination));
+    const matched = getPresetPersona(queryOrigin, queryDestination);
+    setPersona(matched);
   }, [queryDestination, queryOrigin]);
 
   useEffect(() => {
@@ -425,10 +441,12 @@ function CompareContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [origin, destination, timesParam]);
 
-  const activeDef = PERSONA_DEFS.find((p) => p.id === persona)!;
-  const highlightedMetrics = activeDef.focusDimensions.flatMap(
-    (dimension) => PERSONA_FOCUS_TO_METRICS[dimension] ?? [],
-  );
+  const activeDef = persona ? PERSONA_DEFS.find((p) => p.id === persona) : null;
+  const highlightedMetrics = activeDef
+    ? activeDef.focusDimensions.flatMap(
+        (dimension) => PERSONA_FOCUS_TO_METRICS[dimension] ?? [],
+      )
+    : [];
 
   const cardsByTime: Record<string, Record<string, CardData> | undefined> = {};
   if (cardsData) {
@@ -461,6 +479,15 @@ function CompareContent() {
         <PersonaInsightsPanel
           persona={persona}
           onPersonaChange={handlePersonaChange}
+        />
+      </section>
+
+      {/* ── Custom route selector ── */}
+      <section className="reveal-section mb-8">
+        <CustomRouteSelector
+          currentOrigin={origin}
+          currentDestination={destination}
+          onSelect={handleCustomRoute}
         />
       </section>
 
@@ -548,6 +575,8 @@ function CompareContent() {
               times={times}
               options={data.options}
               cardsByTime={cardsByTime}
+              origin={origin}
+              destination={destination}
             />
           </section>
 

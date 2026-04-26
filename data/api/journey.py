@@ -2,6 +2,7 @@
 TfL Journey Planner integration.
 Data sources: TfL Unified API — journey planning, arrivals, status.
 """
+from __future__ import annotations
 
 import asyncio
 

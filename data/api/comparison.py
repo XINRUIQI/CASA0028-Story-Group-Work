@@ -14,6 +14,7 @@ Cards:
     6. Safety exposure     – LSOA crime/visibility-weighted corridor proxy
     7. Lighting proxy      – lit-road share, lamp density
 """
+from __future__ import annotations
 
 import asyncio
 import json
@@ -203,7 +204,7 @@ def _parse_linestring_path(path: str) -> list[tuple[float, float]]:
     if not isinstance(parsed, list):
         return coords
     for pair in parsed:
-        if not isinstance(pair, list | tuple) or len(pair) < 2:
+        if not isinstance(pair, (list, tuple)) or len(pair) < 2:
             continue
         lat, lon = pair[0], pair[1]
         try:

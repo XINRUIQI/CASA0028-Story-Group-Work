@@ -1,0 +1,60 @@
+{
+  "stations": [
+    {
+      "id": "940GZZLUKSX",
+      "name": "King's Cross St. Pancras",
+      "zone": "Central-North"
+    },
+    {
+      "id": "940GZZLULVT",
+      "name": "Liverpool Street",
+      "zone": "Central-East"
+    },
+    {
+      "id": "940GZZLUWLO",
+      "name": "Waterloo",
+      "zone": "Central-South"
+    },
+    {
+      "id": "940GZZLUOXC",
+      "name": "Oxford Circus",
+      "zone": "Central-West"
+    },
+    {
+      "id": "940GZZLUSTD",
+      "name": "Stratford",
+      "zone": "East"
+    },
+    {
+      "id": "940GZZLUBXN",
+      "name": "Brixton",
+      "zone": "South"
+    },
+    {
+      "id": "940GZZLUEAB",
+      "name": "Ealing Broadway",
+      "zone": "West"
+    },
+    {
+      "id": "HUBSVS",
+      "name": "Seven Sisters",
+      "zone": "North"
+    },
+    {
+      "id": "940GZZDLGRE",
+      "name": "Greenwich",
+      "zone": "South-East"
+    },
+    {
+      "id": "940GZZLUCTN",
+      "name": "Camden Town",
+      "zone": "North-Central"
+    }
+  ],
+  "compareTimes": [
+    "18:00",
+    "21:00",
+    "23:30"
+  ],
+  "pairCount": 90
+}

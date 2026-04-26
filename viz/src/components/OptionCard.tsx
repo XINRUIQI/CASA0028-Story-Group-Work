@@ -1,6 +1,7 @@
 "use client";
 
 import type { CardData, Journey, JourneyRecoveryResult } from "@/lib/api";
+import { computeJourneyTotal } from "@/lib/computeJourneyTotal";
 import {
   Clock,
   Footprints,
@@ -246,14 +247,15 @@ export default function OptionCard({
   const se = (cards?.safety_exposure ?? {}) as SafetyExposureCard & CardData;
   const fareDisplay = buildFareDisplay(journey, fc, origin, destination);
   const recoveryDisplay = buildRecoveryDisplay(journey, wb, su, recovery);
+  const effectiveTotal = computeJourneyTotal(journey, time, cards);
 
   const metrics = [
     {
       key: "duration",
       icon: <Clock size={14} />,
       label: "Total time",
-      value: `${journey.duration_min} min`,
-      tone: toneByMinutes(journey.duration_min, 60, 35),
+      value: `${effectiveTotal} min`,
+      tone: toneByMinutes(effectiveTotal, 60, 35),
       source: "functional_cost",
     },
     {
