@@ -16,13 +16,16 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import { api, type FairnessZone } from "@/lib/api";
 import TimeSlider from "@/components/TimeSlider";
 import { interpolateVitality, formatHour, DAYTIME_SNAPSHOT } from "@/lib/vitality";
+import { getPublicBasePath } from "@/lib/publicBasePath";
 
 const MAPBOX_TOKEN =
   process.env.NEXT_PUBLIC_MAPBOX_TOKEN ||
   "pk.eyJ1IjoibGV2aW5lbGl1IiwiYSI6ImNta21vc3doOTBleGYza3IycDNsOXRidXQifQ.SdtOnvfZEml6QGLmnnduDQ";
 const CENTER: [number, number] = [-0.118, 51.509];
-const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
-const GEOJSON_URL = `${BASE_PATH}/london-boroughs.geojson`;
+/* GeoJSON: base may be env-only; fetch runs client-side only so getPublicBasePath() is correct. */
+function boroughGeojsonUrl() {
+  return `${getPublicBasePath()}/london-boroughs.geojson`;
+}
 const N_PTS = 400;
 
 type LayerId =
@@ -261,7 +264,7 @@ export default function FairnessPanel() {
 
   /* Fetch borough GeoJSON once */
   useEffect(() => {
-    fetch(GEOJSON_URL)
+    fetch(boroughGeojsonUrl())
       .then((r) => r.json())
       .then((data: GeoJSON.FeatureCollection) => {
         geoRef.current = data;

@@ -5,6 +5,7 @@ import {
   PERSONA_DEFS,
   type PersonaId,
 } from "@/components/PersonaSwitch";
+import { getStaticDataRoot } from "@/lib/publicBasePath";
 
 const HOURS = [
   "14:00",
@@ -29,7 +30,7 @@ export interface HourlyPoint {
 
 type AllCurves = Record<string, Record<string, HourlyPoint | null>>;
 
-const STATIC_PREFIX = process.env.NEXT_PUBLIC_BASE_PATH || "";
+const IMAGE_PREFIX = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 let _curveCache: AllCurves | null = null;
 let _curvePromise: Promise<AllCurves> | null = null;
@@ -37,7 +38,7 @@ let _curvePromise: Promise<AllCurves> | null = null;
 function loadAllCurves(): Promise<AllCurves> {
   if (_curveCache) return Promise.resolve(_curveCache);
   if (_curvePromise) return _curvePromise;
-  _curvePromise = fetch(`${STATIC_PREFIX}/static-data/persona-curves.json`)
+  _curvePromise = fetch(`${getStaticDataRoot()}/persona-curves.json`)
     .then((r) => (r.ok ? r.json() : {}))
     .catch(() => ({}))
     .then((data: AllCurves) => {
@@ -314,7 +315,7 @@ export default function PersonaInsightsPanel({
               >
                 <div className="choose-persona-portrait">
                   <img
-                    src={`${STATIC_PREFIX}${PERSONA_IMAGES[p.id]}`}
+                    src={`${IMAGE_PREFIX}${PERSONA_IMAGES[p.id]}`}
                     alt={p.label}
                     className="choose-persona-img"
                   />

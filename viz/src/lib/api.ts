@@ -1,7 +1,8 @@
+import { getPublicBasePath } from "./publicBasePath";
+
 /* No default: production / static sites should not hit a backend unless configured. */
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || "").trim().replace(/\/$/, "");
 const USE_LIVE_API = API_BASE.length > 0;
-const STATIC_PREFIX = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 /**
  * Build a deterministic file path for a pre-fetched static JSON response.
@@ -25,7 +26,7 @@ async function fetchStaticJSON<T>(path: string, params?: Record<string, string>)
       `No static data key for ${path} (e.g. params too long). Set NEXT_PUBLIC_API_BASE to use a live API.`,
     );
   }
-  const res = await fetch(`${STATIC_PREFIX}/static-data/${key}`);
+  const res = await fetch(`${getPublicBasePath()}/static-data/${key}`);
   if (!res.ok) {
     throw new Error(
       `Static data missing: /static-data/${key} (${res.status}). Prefetch the route or set NEXT_PUBLIC_API_BASE.`,

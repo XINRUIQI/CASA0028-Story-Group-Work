@@ -18,6 +18,7 @@ import CustomRouteSelector from "@/components/CustomRouteSelector";
 import WhatWeCompare from "@/components/WhatWeCompare";
 import { useReveal } from "@/lib/useReveal";
 import { type ContextTag, CONTEXT_LABELS } from "@/lib/types";
+import { getStaticDataRoot } from "@/lib/publicBasePath";
 import {
   api,
   type CompareResult,
@@ -88,7 +89,7 @@ async function loadStaticCompareCards(
   times: string[],
 ): Promise<CompareCardsResult | null> {
   const encodedTimes = times.join(",").replace(/:/g, "-").replace(/,/g, "_");
-  const path = `/static-data/compare-cards/${destination}__${origin}__${encodedTimes}.json`;
+  const path = `${getStaticDataRoot()}/compare-cards/${destination}__${origin}__${encodedTimes}.json`;
   try {
     const response = await fetch(path);
     if (!response.ok) return null;

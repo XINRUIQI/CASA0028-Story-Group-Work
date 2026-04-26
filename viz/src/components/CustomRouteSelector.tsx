@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { MapPin } from "lucide-react";
-
-const STATIC_PREFIX = process.env.NEXT_PUBLIC_BASE_PATH || "";
+import { getStaticDataRoot } from "@/lib/publicBasePath";
 
 interface Station {
   id: string;
@@ -23,9 +22,7 @@ let _manifestPromise: Promise<StationManifest | null> | null = null;
 function loadManifest(): Promise<StationManifest | null> {
   if (_manifestCache) return Promise.resolve(_manifestCache);
   if (_manifestPromise) return _manifestPromise;
-  _manifestPromise = fetch(
-    `${STATIC_PREFIX}/static-data/custom-od-stations.json`,
-  )
+  _manifestPromise = fetch(`${getStaticDataRoot()}/custom-od-stations.json`)
     .then((r) => (r.ok ? r.json() : null))
     .catch(() => null)
     .then((data: StationManifest | null) => {
