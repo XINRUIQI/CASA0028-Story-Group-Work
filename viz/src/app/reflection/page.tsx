@@ -106,7 +106,7 @@ const CARDS = [
   },
   {
     num: 2,
-    title: "What it cannot know",
+    title: "What this prototype cannot show",
     icon: <AlertTriangle size={20} />,
     iconColor: "var(--accent-amber)",
     items: [
@@ -131,7 +131,7 @@ const CARDS = [
   },
   {
     num: 4,
-    title: "If this prototype gets it wrong",
+    title: "Risks of misinterpretation",
     icon: <AlertCircle size={20} />,
     iconColor: "var(--accent-amber)",
     items: [

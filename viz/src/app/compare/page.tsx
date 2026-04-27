@@ -545,8 +545,9 @@ function CompareContent() {
 
         <p className="mb-2" style={{ color: "var(--text-secondary)" }}>
           This prototype compares departure-time options through waiting,
-          support, reliability, backup options, and route exposure — helping
-          travellers understand the trade-offs before they set off.
+          support, reliability, backup options, and route exposure — not as a
+          route optimiser, but as a way to make hidden journey burdens visible
+          and help travellers understand the trade-offs before they set off.
         </p>
       </section>
 

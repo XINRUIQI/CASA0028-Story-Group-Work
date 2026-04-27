@@ -84,11 +84,20 @@ export default function Mechanisms({ onClose }: MechanismsProps) {
   return (
     <div className="mechanisms-panel">
       <div className="mechanisms-header">
-        <div>
+        <div className="mechanisms-copy">
           <p className="section-label">Behind the scores</p>
           <h2 className="mechanisms-title">How the indicators are estimated</h2>
           <p className="mechanisms-sub">
             Each score is built from route, service, and nearby-context data. The aim is not to label one route as &ldquo;best&rdquo;, but to show what may become harder when you leave later.
+          </p>
+        </div>
+        <div className="mechanisms-theory-note">
+          <h3>Why these indicators?</h3>
+          <p>
+            Journey planners usually make travel legible through time, cost,
+            and transfers. These indicators widen that view with waiting,
+            support, activity, recovery, and exposure — as useful proxies, not
+            objective truths.
           </p>
         </div>
         {onClose && (

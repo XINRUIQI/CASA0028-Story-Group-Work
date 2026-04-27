@@ -689,6 +689,14 @@ export default function FairnessPanel() {
             </div>
           )}
 
+          <div className="fairness-map-caution">
+            These layers do not rank places.
+            <br />
+            They show support conditions made
+            <br />
+            visible through selected data proxies.
+          </div>
+
           {/* Vitality: TimeSlider overlay */}
           {isVitality && (
             <div className="fairness-vitality-slider">
