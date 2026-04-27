@@ -1,0 +1,41 @@
+{
+  "daytime": {
+    "time_band": "inter_peak (10:00\u201316:00)",
+    "active_tube_lines": 11,
+    "active_bus_routes": 675,
+    "active_dlr_lines": 1,
+    "active_overground_lines": 6,
+    "active_elizabeth_line": 1,
+    "approx_active_stops": 19000,
+    "mean_tube_headway_min": 3.5,
+    "mean_bus_headway_min": 8,
+    "support_poi_open_pct": 0.85,
+    "note": "Most services, POIs, and stations operating at full capacity."
+  },
+  "evening": {
+    "time_band": "evening (19:00\u201322:00)",
+    "active_tube_lines": 11,
+    "active_bus_routes": 650,
+    "active_dlr_lines": 1,
+    "active_overground_lines": 6,
+    "active_elizabeth_line": 1,
+    "approx_active_stops": 18500,
+    "mean_tube_headway_min": 6,
+    "mean_bus_headway_min": 12,
+    "support_poi_open_pct": 0.55,
+    "note": "Service frequency drops; many shops and pharmacies begin closing."
+  },
+  "late_night": {
+    "time_band": "late_night (22:00\u201307:00)",
+    "active_tube_lines": 5,
+    "active_bus_routes": 120,
+    "active_dlr_lines": 0,
+    "active_overground_lines": 2,
+    "active_elizabeth_line": 0,
+    "approx_active_stops": 6500,
+    "mean_tube_headway_min": 10,
+    "mean_bus_headway_min": 18,
+    "support_poi_open_pct": 0.15,
+    "note": "Night Tube on 5 lines (Fri/Sat); night buses only otherwise. Most POIs closed."
+  }
+}
