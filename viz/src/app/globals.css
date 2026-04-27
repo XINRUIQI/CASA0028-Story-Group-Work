@@ -147,7 +147,7 @@ body {
   overflow: hidden;
   background-image:
     linear-gradient(180deg, rgba(20, 14, 30, 0.12) 0%, rgba(10, 8, 22, 0.25) 60%, rgba(6, 8, 16, 0.45) 100%),
-    url("/background2.png");
+    var(--hero-cover-image, url("/background2.png"));
   background-size: cover;
   background-position: center center;
   background-repeat: no-repeat;

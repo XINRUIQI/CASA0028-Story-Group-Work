@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, type CSSProperties } from "react";
 import { Clock, ShieldCheck, Activity, HelpCircle } from "lucide-react";
+import { getPublicBasePath } from "@/lib/publicBasePath";
 
 const STAR_COUNT = 90;
 
@@ -64,6 +65,9 @@ const INTRO_DIMENSIONS = [
 export default function HeroCover() {
   const [visible, setVisible] = useState(false);
   const introRef = useRef<HTMLElement>(null);
+  const heroStyle = {
+    "--hero-cover-image": `url("${getPublicBasePath()}/background2.png")`,
+  } as CSSProperties;
 
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 300);
@@ -83,7 +87,7 @@ export default function HeroCover() {
   return (
     <>
       {/* ── Hero cover (full-screen) ─────────────────────────────── */}
-      <section className="hero-cover">
+      <section className="hero-cover" style={heroStyle}>
         {/* Starfield */}
         <div className="hero-stars">
           {STATIC_STARS.map((star, i) => (
