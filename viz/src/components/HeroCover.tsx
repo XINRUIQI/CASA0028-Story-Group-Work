@@ -66,7 +66,7 @@ export default function HeroCover() {
   const [visible, setVisible] = useState(false);
   const introRef = useRef<HTMLElement>(null);
   const heroStyle = {
-    "--hero-cover-image": `url("${getPublicBasePath()}/background2.png")`,
+    "--hero-cover-image": `url("${getPublicBasePath()}/images/backgrounds/background2.png")`,
   } as CSSProperties;
 
   useEffect(() => {

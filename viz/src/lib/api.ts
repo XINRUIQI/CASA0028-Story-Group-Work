@@ -2,7 +2,8 @@ import { getPublicBasePath } from "./publicBasePath";
 
 /* No default: production / static sites should not hit a backend unless configured. */
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || "").trim().replace(/\/$/, "");
-const USE_LIVE_API = API_BASE.length > 0;
+const STATIC_DATA_ONLY = process.env.NEXT_PUBLIC_STATIC_DATA_ONLY === "true";
+const USE_LIVE_API = API_BASE.length > 0 && !STATIC_DATA_ONLY;
 
 /** True when a live FastAPI backend is configured via NEXT_PUBLIC_API_BASE.
  * Components should use this to skip optional refinements that only make

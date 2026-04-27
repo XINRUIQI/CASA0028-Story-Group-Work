@@ -33,7 +33,7 @@ const PERSONA_NARRATIVE: Record<PersonaId, PersonaNarrativeMeta> = {
     pronoun: { subject: "he", possessive: "his" },
     setup: "has just finished studying late",
     concern: "what worries him most is a route that suddenly takes much longer",
-    image: "/01_late_night_student.png",
+    image: "/images/personas/01_late_night_student.png",
     accent: "var(--champagne-gold)",
   },
   budget: {
@@ -42,7 +42,7 @@ const PERSONA_NARRATIVE: Record<PersonaId, PersonaNarrativeMeta> = {
     pronoun: { subject: "she", possessive: "her" },
     setup: "is heading back with two heavy bags",
     concern: "she wants less walking, less waiting, fewer changes",
-    image: "/02_passenger_with_luggage.png",
+    image: "/images/personas/02_passenger_with_luggage.png",
     accent: "var(--accent-amber)",
   },
   nightworker: {
@@ -51,7 +51,7 @@ const PERSONA_NARRATIVE: Record<PersonaId, PersonaNarrativeMeta> = {
     pronoun: { subject: "she", possessive: "her" },
     setup: "has just clocked off a long night shift",
     concern: "she needs services that still run, and that she can rely on",
-    image: "/03_night_shift_worker.png",
+    image: "/images/personas/03_night_shift_worker.png",
     accent: "var(--accent-emerald)",
   },
   unfamiliar: {
@@ -61,7 +61,7 @@ const PERSONA_NARRATIVE: Record<PersonaId, PersonaNarrativeMeta> = {
     setup: "is heading back at the end of her first day in London",
     concern:
       "she wants a simple route — and someone nearby in case something goes wrong",
-    image: "/04_first_time_visitor.png",
+    image: "/images/personas/04_first_time_visitor.png",
     accent: "var(--accent-rose)",
   },
   custom: {
@@ -70,7 +70,7 @@ const PERSONA_NARRATIVE: Record<PersonaId, PersonaNarrativeMeta> = {
     pronoun: { subject: "you", possessive: "your" },
     setup: "are mapping a journey of your own",
     concern: "you can compare departure times to see how the trip changes",
-    image: "/05_custom_traveller.png",
+    image: "/images/personas/05_custom_traveller.png",
     accent: "var(--text-secondary)",
   },
 };

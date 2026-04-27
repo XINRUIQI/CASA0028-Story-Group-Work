@@ -7,7 +7,12 @@ A decision-support prototype for CASA0028, exploring how public transport journe
 ## Project Structure
 
 ```
+├── docs/                  Planning docs and assignment files
 ├── viz/                   Next.js + Tailwind CSS + Mapbox GL JS
+│   ├── assets/source/     Editable/source image assets not served by Next.js
+│   ├── public/
+│   │   ├── images/        Web-ready persona portraits, backgrounds, icons
+│   │   └── static-data/   Pre-generated JSON / GeoJSON used by the site
 │   ├── src/app/           4 pages: Landing / Compare / Unpack / Reflection
 │   ├── src/components/    Reusable UI components
 │   └── src/lib/           API client + shared types
@@ -40,7 +45,7 @@ To get a live page, use **[Deploy to GitHub Pages](.github/workflows/deploy-page
 2. Push to `main` (or run the workflow manually under **Actions → Deploy to GitHub Pages → Run workflow**).
 3. After the deploy job finishes, open **Settings → Pages** again — the site URL is shown (typically `https://<username>.github.io/<repository>/`).
 
-Optional: add a repository **variable** `NEXT_PUBLIC_API_BASE` (same page) with the public URL of your FastAPI backend if you need live data. If unset, the viz uses **static JSON** under `viz/public/static-data` only and does not call a backend. For local development with a running API, create `viz/.env.local` with e.g. `NEXT_PUBLIC_API_BASE=http://127.0.0.1:8000`.
+The deployed viz uses **static JSON** under `viz/public/static-data` and does not call a backend. For local development with a running API, remove `NEXT_PUBLIC_STATIC_DATA_ONLY=true` and create `viz/.env.local` with e.g. `NEXT_PUBLIC_API_BASE=http://127.0.0.1:8000`.
 
 ## Quick Start
 

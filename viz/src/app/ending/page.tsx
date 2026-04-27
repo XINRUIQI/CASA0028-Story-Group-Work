@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
-import { useRouter } from "next/navigation";
 import { getPublicBasePath } from "@/lib/publicBasePath";
 
 export default function EndingPage() {
-  const router = useRouter();
   const [visible, setVisible] = useState(false);
   const pageStyle = {
-    "--final-cover-image": `url("${getPublicBasePath()}/background4.png")`,
+    "--final-cover-image": `url("${getPublicBasePath()}/images/backgrounds/background4.png")`,
   } as CSSProperties;
+  const goToStart = () => {
+    window.location.assign(`${getPublicBasePath() || ""}/`);
+  };
 
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 400);
@@ -94,7 +95,7 @@ export default function EndingPage() {
         </div>
 
         {/* Back to Top pill button */}
-        <button onClick={() => router.push("/")} className="final-back-btn" type="button">
+        <button onClick={goToStart} className="final-back-btn" type="button">
           &uarr;&ensp;Back to Start
         </button>
       </div>

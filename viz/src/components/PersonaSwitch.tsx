@@ -65,8 +65,8 @@ function PersonaImg({ src, alt }: { src: string; alt: string }) {
 export const PERSONA_DEFS: PersonaDef[] = [
   {
     id: "student",
-    icon: <PersonaImg src="/01_late_night_student.png" alt="Student" />,
-    image: "/01_late_night_student.png",
+    icon: <PersonaImg src="/images/personas/01_late_night_student.png" alt="Student" />,
+    image: "/images/personas/01_late_night_student.png",
     label: "Late-night Student",
     accent: "var(--champagne-gold)",
     focusDimensions: ["waiting_burden", "activity_context"],
@@ -75,8 +75,8 @@ export const PERSONA_DEFS: PersonaDef[] = [
   },
   {
     id: "budget",
-    icon: <PersonaImg src="/02_passenger_with_luggage.png" alt="Luggage" />,
-    image: "/02_passenger_with_luggage.png",
+    icon: <PersonaImg src="/images/personas/02_passenger_with_luggage.png" alt="Luggage" />,
+    image: "/images/personas/02_passenger_with_luggage.png",
     label: "Passenger with Luggage",
     accent: "var(--accent-amber)",
     focusDimensions: ["functional_cost", "waiting_burden"],
@@ -85,8 +85,8 @@ export const PERSONA_DEFS: PersonaDef[] = [
   },
   {
     id: "nightworker",
-    icon: <PersonaImg src="/03_night_shift_worker.png" alt="Night worker" />,
-    image: "/03_night_shift_worker.png",
+    icon: <PersonaImg src="/images/personas/03_night_shift_worker.png" alt="Night worker" />,
+    image: "/images/personas/03_night_shift_worker.png",
     label: "Night-shift Worker",
     accent: "var(--accent-emerald)",
     focusDimensions: ["service_uncertainty", "waiting_burden"],
@@ -95,8 +95,8 @@ export const PERSONA_DEFS: PersonaDef[] = [
   },
   {
     id: "unfamiliar",
-    icon: <PersonaImg src="/04_first_time_visitor.png" alt="Visitor" />,
-    image: "/04_first_time_visitor.png",
+    icon: <PersonaImg src="/images/personas/04_first_time_visitor.png" alt="Visitor" />,
+    image: "/images/personas/04_first_time_visitor.png",
     label: "First-time Visitor",
     accent: "var(--accent-rose)",
     focusDimensions: ["functional_cost", "support_access"],
@@ -105,8 +105,8 @@ export const PERSONA_DEFS: PersonaDef[] = [
   },
   {
     id: "custom",
-    icon: <PersonaImg src="/05_custom_traveller.png" alt="Custom" />,
-    image: "/05_custom_traveller.png",
+    icon: <PersonaImg src="/images/personas/05_custom_traveller.png" alt="Custom" />,
+    image: "/images/personas/05_custom_traveller.png",
     label: "Custom Traveller",
     accent: "var(--text-secondary)",
     focusDimensions: [],

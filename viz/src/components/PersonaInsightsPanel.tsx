@@ -51,11 +51,11 @@ function loadAllCurves(): Promise<AllCurves> {
 /* ── Persona portrait images ── */
 
 const PERSONA_IMAGES: Record<PersonaId, string> = {
-  student: "/01_late_night_student.png",
-  budget: "/02_passenger_with_luggage.png",
-  nightworker: "/03_night_shift_worker.png",
-  unfamiliar: "/04_first_time_visitor.png",
-  custom: "/05_custom_traveller.png",
+  student: "/images/personas/01_late_night_student.png",
+  budget: "/images/personas/02_passenger_with_luggage.png",
+  nightworker: "/images/personas/03_night_shift_worker.png",
+  unfamiliar: "/images/personas/04_first_time_visitor.png",
+  custom: "/images/personas/05_custom_traveller.png",
 };
 
 /* ── Line chart ── */

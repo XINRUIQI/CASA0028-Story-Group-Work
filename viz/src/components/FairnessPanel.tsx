@@ -11,7 +11,7 @@ import {
   ChevronDown,
   Zap,
 } from "lucide-react";
-import mapboxgl from "mapbox-gl";
+import type mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { api, type FairnessZone } from "@/lib/api";
 import TimeSlider from "@/components/TimeSlider";
@@ -24,7 +24,7 @@ const MAPBOX_TOKEN =
 const CENTER: [number, number] = [-0.118, 51.509];
 /* GeoJSON: base may be env-only; fetch runs client-side only so getPublicBasePath() is correct. */
 function boroughGeojsonUrl() {
-  return `${getPublicBasePath()}/london-boroughs.geojson`;
+  return `${getPublicBasePath()}/static-data/london-boroughs.geojson`;
 }
 const N_PTS = 400;
 
@@ -347,6 +347,7 @@ export default function FairnessPanel() {
   const [activeLayer, setActiveLayer] = useState<LayerId>("city_vitality");
   const [hour, setHour] = useState(9);
   const [showScoreGuide, setShowScoreGuide] = useState(false);
+  const [mapError, setMapError] = useState<string | null>(null);
   const [zones, setZones] = useState<Record<string, FairnessZone>>({});
   const [fetchedLayer, setFetchedLayer] = useState<string>("");
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -440,148 +441,193 @@ export default function FairnessPanel() {
   useEffect(() => {
     const el = mapContainerRef.current;
     if (!el || !MAPBOX_TOKEN) return;
+    let cancelled = false;
+    let m: mapboxgl.Map | null = null;
+    let scaleObserver: MutationObserver | null = null;
+    const reportMapUnavailable = (message: string) => {
+      if (!cancelled) setMapError(message);
+    };
 
-    if (mapRef.current) {
-      mapRef.current.remove();
-      mapRef.current = null;
-      readyRef.current = false;
-    }
+    const initMap = async () => {
+      let mapboxglRuntime: typeof import("mapbox-gl").default;
+      try {
+        mapboxglRuntime = (await import("mapbox-gl")).default;
+      } catch {
+        reportMapUnavailable("Interactive map unavailable because Mapbox could not load.");
+        return;
+      }
 
-    mapboxgl.accessToken = MAPBOX_TOKEN;
-    const m = new mapboxgl.Map({
-      container: el,
-      style: "mapbox://styles/mapbox/light-v11",
-      center: CENTER,
-      zoom: 9.3,
-      interactive: true,
-      attributionControl: false,
-    });
-    mapRef.current = m;
+      if (cancelled || !mapContainerRef.current) return;
 
-    // 3. Scale bar (bottom — added first, stacks at bottom)
-    const scaleCtrl = new mapboxgl.ScaleControl({ maxWidth: 120, unit: "metric" });
-    m.addControl(scaleCtrl, "bottom-left");
-    const scaleEl = (scaleCtrl as unknown as { _container?: HTMLElement })._container;
-    if (scaleEl) {
-      const fixLang = () => {
-        const txt = scaleEl.textContent || "";
-        const fixed = txt.replace(/公里/, "km").replace(/米/, "m");
-        if (fixed !== txt) scaleEl.textContent = fixed;
-      };
-      fixLang();
-      new MutationObserver(fixLang).observe(scaleEl, { childList: true, characterData: true, subtree: true });
-    }
+      try {
+        if (!mapboxglRuntime.supported()) {
+          reportMapUnavailable("Interactive map unavailable because WebGL is not supported in this browser.");
+          return;
+        }
+      } catch {
+        reportMapUnavailable("Interactive map unavailable because WebGL is not supported in this browser.");
+        return;
+      }
 
-    // 2. Home / reset view (middle)
-    class HomeControl implements mapboxgl.IControl {
-      _container?: HTMLElement;
-      onAdd() {
-        const btn = document.createElement("button");
-        btn.className = "fairness-home-ctrl";
-        btn.type = "button";
-        btn.title = "Reset view";
-        btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="1"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>`;
-        btn.addEventListener("click", () => {
-          mapRef.current?.flyTo({ center: CENTER, zoom: 9.3, pitch: 0, bearing: 0, duration: 800 });
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+        readyRef.current = false;
+      }
+
+      mapboxglRuntime.accessToken = MAPBOX_TOKEN;
+      try {
+        m = new mapboxglRuntime.Map({
+          container: mapContainerRef.current,
+          style: "mapbox://styles/mapbox/light-v11",
+          center: CENTER,
+          zoom: 9.3,
+          interactive: true,
+          attributionControl: false,
         });
-        const div = document.createElement("div");
-        div.className = "mapboxgl-ctrl mapboxgl-ctrl-group";
-        div.appendChild(btn);
-        this._container = div;
-        return div;
+      } catch {
+        reportMapUnavailable("Interactive map unavailable because Mapbox could not initialize.");
+        return;
       }
-      onRemove() { this._container?.remove(); }
-    }
-    m.addControl(new HomeControl(), "bottom-left");
+      mapRef.current = m;
 
-    // 1. Compass (top — added last, stacks at top)
-    m.addControl(new mapboxgl.NavigationControl({ showCompass: true, showZoom: false }), "bottom-left");
-
-    m.on("load", () => {
-      if (mapRef.current !== m) return;
-      m.resize();
-
-      // Fade base map layers, keep custom layers at full opacity
-      const BASE_OPACITY = 0.45;
-      for (const l of m.getStyle()?.layers ?? []) {
-        try {
-          if (l.type === "background")
-            m.setPaintProperty(l.id, "background-opacity", BASE_OPACITY);
-          else if (l.type === "fill" && !l.id.startsWith("borough"))
-            m.setPaintProperty(l.id, "fill-opacity", BASE_OPACITY);
-          else if (l.type === "line" && !l.id.startsWith("borough"))
-            m.setPaintProperty(l.id, "line-opacity", BASE_OPACITY);
-          else if (l.type === "symbol")
-            m.setPaintProperty(l.id, "text-opacity", BASE_OPACITY + 0.15);
-        } catch { /* ok */ }
-        if (l.type === "symbol") {
-          try { m.setPaintProperty(l.id, "text-opacity-transition", { duration: 600 }); } catch { /* ok */ }
-        }
-      }
-
-      // Choropleth layers
-      const initData = geoRef.current
-        ? mergeGeoWithZones(geoRef.current, zonesRef.current, activeLayerRef.current)
-        : EMPTY_FC;
-
-      m.addSource("boroughs", { type: "geojson", data: initData });
-      m.addLayer({
-        id: "borough-fills", type: "fill", source: "boroughs",
-        layout: { visibility: "none" },
-        paint: {
-          "fill-color": ["coalesce", ["get", "fill_color"], "rgba(40,50,90,0.5)"],
-          "fill-opacity": 0.75,
-        },
-      });
-      m.addLayer({
-        id: "borough-borders", type: "line", source: "boroughs",
-        layout: { visibility: "none" },
-        paint: { "line-color": "rgba(200,200,220,0.25)", "line-width": 1 },
-      });
-
-      // Vitality point layers
-      m.addSource("vp", { type: "geojson", data: vitalityGeoJSON });
-      m.addLayer({
-        id: "pts-glow", type: "circle", source: "vp",
-        paint: {
-          "circle-radius": 14, "circle-color": "#d4944a",
-          "circle-opacity": 0, "circle-opacity-transition": { duration: 600 },
-          "circle-blur": 1,
-        },
-      });
-      m.addLayer({
-        id: "pts-vitality", type: "circle", source: "vp",
-        paint: {
-          "circle-radius": 4, "circle-color": "#d4944a",
-          "circle-opacity": 0.85, "circle-opacity-transition": { duration: 600 },
-        },
-      });
-
-      // Borough popup
-      const popup = new mapboxgl.Popup({ closeButton: false, closeOnClick: false, className: "fairness-popup" });
-      m.on("mousemove", "borough-fills", (e) => {
-        m.getCanvas().style.cursor = "pointer";
-        const props = e.features?.[0]?.properties;
-        if (props) {
-          popup.setLngLat(e.lngLat).setHTML(
-            buildBoroughPopupHtml(props, activeLayerRef.current)
-          ).addTo(m);
+      m.on("error", () => {
+        if (!readyRef.current) {
+          reportMapUnavailable("Interactive map unavailable because Mapbox could not initialize.");
         }
       });
-      m.on("mouseleave", "borough-fills", () => {
-        m.getCanvas().style.cursor = "";
-        popup.remove();
+
+      // 3. Scale bar (bottom — added first, stacks at bottom)
+      const scaleCtrl = new mapboxglRuntime.ScaleControl({ maxWidth: 120, unit: "metric" });
+      m.addControl(scaleCtrl, "bottom-left");
+      const scaleEl = (scaleCtrl as unknown as { _container?: HTMLElement })._container;
+      if (scaleEl) {
+        const fixLang = () => {
+          const txt = scaleEl.textContent || "";
+          const fixed = txt.replace(/公里/, "km").replace(/米/, "m");
+          if (fixed !== txt) scaleEl.textContent = fixed;
+        };
+        fixLang();
+        scaleObserver = new MutationObserver(fixLang);
+        scaleObserver.observe(scaleEl, { childList: true, characterData: true, subtree: true });
+      }
+
+      // 2. Home / reset view (middle)
+      class HomeControl implements mapboxgl.IControl {
+        _container?: HTMLElement;
+        onAdd() {
+          const btn = document.createElement("button");
+          btn.className = "fairness-home-ctrl";
+          btn.type = "button";
+          btn.title = "Reset view";
+          btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="1"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>`;
+          btn.addEventListener("click", () => {
+            mapRef.current?.flyTo({ center: CENTER, zoom: 9.3, pitch: 0, bearing: 0, duration: 800 });
+          });
+          const div = document.createElement("div");
+          div.className = "mapboxgl-ctrl mapboxgl-ctrl-group";
+          div.appendChild(btn);
+          this._container = div;
+          return div;
+        }
+        onRemove() { this._container?.remove(); }
+      }
+      m.addControl(new HomeControl(), "bottom-left");
+
+      // 1. Compass (top — added last, stacks at top)
+      m.addControl(new mapboxglRuntime.NavigationControl({ showCompass: true, showZoom: false }), "bottom-left");
+
+      m.on("load", () => {
+        if (mapRef.current !== m || !m) return;
+        const currentMap = m;
+        currentMap.resize();
+
+        // Fade base map layers, keep custom layers at full opacity
+        const BASE_OPACITY = 0.45;
+        for (const l of currentMap.getStyle()?.layers ?? []) {
+          try {
+            if (l.type === "background")
+              currentMap.setPaintProperty(l.id, "background-opacity", BASE_OPACITY);
+            else if (l.type === "fill" && !l.id.startsWith("borough"))
+              currentMap.setPaintProperty(l.id, "fill-opacity", BASE_OPACITY);
+            else if (l.type === "line" && !l.id.startsWith("borough"))
+              currentMap.setPaintProperty(l.id, "line-opacity", BASE_OPACITY);
+            else if (l.type === "symbol")
+              currentMap.setPaintProperty(l.id, "text-opacity", BASE_OPACITY + 0.15);
+          } catch { /* ok */ }
+          if (l.type === "symbol") {
+            try { currentMap.setPaintProperty(l.id, "text-opacity-transition", { duration: 600 }); } catch { /* ok */ }
+          }
+        }
+
+        // Choropleth layers
+        const initData = geoRef.current
+          ? mergeGeoWithZones(geoRef.current, zonesRef.current, activeLayerRef.current)
+          : EMPTY_FC;
+
+        currentMap.addSource("boroughs", { type: "geojson", data: initData });
+        currentMap.addLayer({
+          id: "borough-fills", type: "fill", source: "boroughs",
+          layout: { visibility: "none" },
+          paint: {
+            "fill-color": ["coalesce", ["get", "fill_color"], "rgba(40,50,90,0.5)"],
+            "fill-opacity": 0.75,
+          },
+        });
+        currentMap.addLayer({
+          id: "borough-borders", type: "line", source: "boroughs",
+          layout: { visibility: "none" },
+          paint: { "line-color": "rgba(200,200,220,0.25)", "line-width": 1 },
+        });
+
+        // Vitality point layers
+        currentMap.addSource("vp", { type: "geojson", data: vitalityGeoJSON });
+        currentMap.addLayer({
+          id: "pts-glow", type: "circle", source: "vp",
+          paint: {
+            "circle-radius": 14, "circle-color": "#d4944a",
+            "circle-opacity": 0, "circle-opacity-transition": { duration: 600 },
+            "circle-blur": 1,
+          },
+        });
+        currentMap.addLayer({
+          id: "pts-vitality", type: "circle", source: "vp",
+          paint: {
+            "circle-radius": 4, "circle-color": "#d4944a",
+            "circle-opacity": 0.85, "circle-opacity-transition": { duration: 600 },
+          },
+        });
+
+        // Borough popup
+        const popup = new mapboxglRuntime.Popup({ closeButton: false, closeOnClick: false, className: "fairness-popup" });
+        currentMap.on("mousemove", "borough-fills", (e) => {
+          currentMap.getCanvas().style.cursor = "pointer";
+          const props = e.features?.[0]?.properties;
+          if (props) {
+            popup.setLngLat(e.lngLat).setHTML(
+              buildBoroughPopupHtml(props, activeLayerRef.current)
+            ).addTo(currentMap);
+          }
+        });
+        currentMap.on("mouseleave", "borough-fills", () => {
+          currentMap.getCanvas().style.cursor = "";
+          popup.remove();
+        });
+
+        readyRef.current = true;
+
+        // Apply vitality theme immediately so the map starts yellow
+        const initSnap = interpolateVitality(9);
+        applyVitality(currentMap, 9, initSnap.density, initSnap.color);
       });
+    };
 
-      readyRef.current = true;
-
-      // Apply vitality theme immediately so the map starts yellow
-      const initSnap = interpolateVitality(9);
-      applyVitality(m, 9, initSnap.density, initSnap.color);
-    });
+    void initMap();
 
     return () => {
-      m.remove();
+      cancelled = true;
+      scaleObserver?.disconnect();
+      m?.remove();
       if (mapRef.current === m) { mapRef.current = null; readyRef.current = false; }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -618,6 +664,9 @@ export default function FairnessPanel() {
 
   const activeLayerDef = LAYERS.find((l) => l.id === activeLayer);
   const activeGuide = SCORE_GUIDE.find((item) => item.id === activeLayer);
+  const mapUnavailableMessage = !MAPBOX_TOKEN
+    ? "Map requires NEXT_PUBLIC_MAPBOX_TOKEN."
+    : mapError;
 
   return (
     <div className="fairness-page-wrap fullscreen-mode">
@@ -681,11 +730,35 @@ export default function FairnessPanel() {
         </div>
 
         <div className="fairness-map-area">
-          {MAPBOX_TOKEN ? (
+          {MAPBOX_TOKEN && !mapError ? (
             <div ref={mapContainerRef} className="fairness-map-container" />
           ) : (
-            <div className="fairness-map-placeholder">
-              <p>Map requires NEXT_PUBLIC_MAPBOX_TOKEN</p>
+            <div className="fairness-map-placeholder fairness-map-fallback">
+              <div className="fairness-map-fallback-card">
+                <span className="fairness-map-fallback-kicker">Map fallback</span>
+                <h2>{activeLayerDef?.label ?? "Selected layer"}</h2>
+                <p>{mapUnavailableMessage}</p>
+                <p>{activeGuide?.body}</p>
+
+                {isVitality ? (
+                  <div className="fairness-map-fallback-stats">
+                    <span>City Vitality</span>
+                    <strong style={{ color: snap.color }}>
+                      {Math.round(snap.density * 100)}%
+                    </strong>
+                    <small>{formatHour(hour)} snapshot</small>
+                  </div>
+                ) : (
+                  <div className="fairness-map-fallback-legend">
+                    <span>{LAYER_EXPLAINER[activeLayer].legendTitle}</span>
+                    <div className="fairness-map-fallback-scale">
+                      {getLegendLabels(activeLayer).map((label) => (
+                        <small key={label}>{label}</small>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

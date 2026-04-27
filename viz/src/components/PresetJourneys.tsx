@@ -20,7 +20,7 @@ interface PresetRoute {
 const PRESETS: PresetRoute[] = [
   {
     id: "student",
-    image: "/01_late_night_student.png",
+    image: "/images/personas/01_late_night_student.png",
     label: "Late-night Student",
     description: "UCL to Seven Sisters — returning from the library",
     originName: "Euston Square",
@@ -32,7 +32,7 @@ const PRESETS: PresetRoute[] = [
   },
   {
     id: "budget",
-    image: "/02_passenger_with_luggage.png",
+    image: "/images/personas/02_passenger_with_luggage.png",
     label: "Passenger with Luggage",
     description: "Stratford to Brixton — less walking, fewer changes",
     originName: "Stratford",
@@ -44,7 +44,7 @@ const PRESETS: PresetRoute[] = [
   },
   {
     id: "nightworker",
-    image: "/03_night_shift_worker.png",
+    image: "/images/personas/03_night_shift_worker.png",
     label: "Night-shift Worker",
     description: "King's Cross to Barking — finishing late",
     originName: "King's Cross",
@@ -56,7 +56,7 @@ const PRESETS: PresetRoute[] = [
   },
   {
     id: "unfamiliar",
-    image: "/04_first_time_visitor.png",
+    image: "/images/personas/04_first_time_visitor.png",
     label: "First-time Visitor",
     description: "Liverpool Street to Greenwich — first time in London",
     originName: "Liverpool Street",
