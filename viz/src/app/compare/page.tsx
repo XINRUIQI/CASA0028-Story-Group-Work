@@ -275,11 +275,14 @@ function CompareContent() {
   const queryDestinationName = searchParams.get("destinationName") || DEFAULT_DEST_NAME;
   const timesParam = searchParams.get("times") || DEFAULT_COMPARE_TIMES;
   const contextsParam = searchParams.get("contexts") || "";
+  const hasExplicitRouteParams =
+    searchParams.has("origin") && searchParams.has("destination");
+  const queryPresetPersona = getPresetPersona(queryOrigin, queryDestination);
 
   const times = timesParam.split(",").filter(Boolean);
   const contexts = contextsParam.split(",").filter(Boolean) as ContextTag[];
   const [persona, setPersona] = useState<PersonaId | null>(() =>
-    getPresetPersona(queryOrigin, queryDestination) ?? "student",
+    queryPresetPersona ?? "student",
   );
 
   const activeRoute = persona && persona !== "custom"
@@ -289,6 +292,8 @@ function CompareContent() {
   const originName = activeRoute?.oName ?? queryOriginName;
   const destination = activeRoute?.dest ?? queryDestination;
   const destinationName = activeRoute?.dName ?? queryDestinationName;
+  const shouldPopulateCustomRoute =
+    persona === "custom" && hasExplicitRouteParams && queryPresetPersona === null;
 
   const [data, setData] = useState<CompareResult | null>(null);
   const [cardsData, setCardsData] = useState<CompareCardsResult | null>(null);
@@ -567,8 +572,8 @@ function CompareContent() {
             persona === "custom" ? (
               <div className="choose-journey-header choose-journey-header--custom">
                 <CustomRouteSelector
-                  currentOrigin={origin}
-                  currentDestination={destination}
+                  currentOrigin={shouldPopulateCustomRoute ? origin : undefined}
+                  currentDestination={shouldPopulateCustomRoute ? destination : undefined}
                   onSelect={handleCustomRoute}
                 />
               </div>
