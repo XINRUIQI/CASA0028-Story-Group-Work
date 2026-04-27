@@ -50,7 +50,7 @@ const ECHO_BLOCKS: {
     accent: "var(--accent-rose)",
     body: (
       <>
-        Evidence from disabled passengers and TfL's equality work shows
+        Evidence from disabled passengers and TfL&apos;s equality work shows
         that night-time public transport is shaped by unequal access,
         confidence and support, not simply by inconvenience.
         <sup className="refl-echo-ref">[1][2]</sup> Those calculations rarely
