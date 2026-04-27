@@ -88,7 +88,7 @@ const LAYERS: LayerDef[] = [
   },
   {
     id: "low_light_walking_burden",
-    label: "Low-Support Exposure",
+    label: "Exposed Walking",
     icon: <Lightbulb size={14} />,
     accent: "var(--champagne-gold)",
     unit: "exposure proxy",
@@ -139,6 +139,57 @@ const SCORE_GUIDE: Array<{
     higherLine: "Higher score = more exposed walking context.",
   },
 ];
+
+const LAYER_EXPLAINER: Record<LayerId, {
+  legendTitle: string;
+  issueLabel: string;
+  dayLabel: string;
+  nightLabel: string;
+  hint: string;
+}> = {
+  city_vitality: {
+    legendTitle: "City vitality [low -> high]",
+    issueLabel: "Night-time support",
+    dayLabel: "Day baseline",
+    nightLabel: "Night level",
+    hint: "Higher means stronger night-time support.",
+  },
+  waiting_burden_increase: {
+    legendTitle: "How much service dropped [little --> severe]",
+    issueLabel: "Service dropped by",
+    dayLabel: "Day wait proxy",
+    nightLabel: "Night wait proxy",
+    hint: "Higher means more service loss after dark, so travel may feel harder.",
+  },
+  support_access_loss: {
+    legendTitle: "Support gap [small --> large]",
+    issueLabel: "Support gap",
+    dayLabel: "Day support level",
+    nightLabel: "Night support level",
+    hint: "Higher means fewer open support places compared with night-time need.",
+  },
+  recovery_difficulty_increase: {
+    legendTitle: "Recovery difficulty [easy --> hard]",
+    issueLabel: "Recovery difficulty",
+    dayLabel: "Day backup level",
+    nightLabel: "Night backup level",
+    hint: "Higher means fewer backup options if a journey goes wrong.",
+  },
+  activity_decline: {
+    legendTitle: "Activity loss [small --> large]",
+    issueLabel: "Activity lost",
+    dayLabel: "Day activity level",
+    nightLabel: "Night activity level",
+    hint: "Higher means the area becomes much quieter after dark.",
+  },
+  low_light_walking_burden: {
+    legendTitle: "Exposed walking [low --> high]",
+    issueLabel: "Exposed walking",
+    dayLabel: "Day support context",
+    nightLabel: "Night support context",
+    hint: "Higher means more walking through places with weaker late-night support.",
+  },
+};
 
 function dropColor(ratio: number, min = 0, max = 0.8): string {
   const span = Math.max(max - min, 0.001);
@@ -231,6 +282,45 @@ function buildVitalityGeoJSON(): GeoJSON.FeatureCollection {
   return { type: "FeatureCollection", features };
 }
 
+function escapeHtml(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function formatPercent(value: number): string {
+  if (!Number.isFinite(value)) return "0%";
+  return `${Math.round(value * 100)}%`;
+}
+
+function formatLayerValue(layer: LayerId, value: number): string {
+  if (!Number.isFinite(value)) return "0";
+  if (layer === "activity_decline" || layer === "low_light_walking_burden" || Math.abs(value) <= 1) {
+    return `${Math.round(value * 100)}%`;
+  }
+  if (layer === "waiting_burden_increase") {
+    return `${value.toFixed(value % 1 === 0 ? 0 : 1)} min`;
+  }
+  return value.toFixed(value % 1 === 0 ? 0 : 1);
+}
+
+function buildBoroughPopupHtml(props: mapboxgl.GeoJSONFeature["properties"], layer: LayerId): string {
+  const copy = LAYER_EXPLAINER[layer];
+  const dropRatio = Number(props?.drop_ratio);
+  const dayValue = Number(props?.day_value);
+  const nightValue = Number(props?.night_value);
+
+  return (
+    `<strong>${escapeHtml(props?.name)}</strong><br/>` +
+    `${copy.issueLabel}: ${formatPercent(dropRatio)}<br/>` +
+    `${copy.dayLabel}: ${formatLayerValue(layer, dayValue)}<br/>` +
+    `${copy.nightLabel}: ${formatLayerValue(layer, nightValue)}<br/>` +
+    `<span class="fairness-popup-hint">${copy.hint}</span>`
+  );
+}
+
 /* ── Main component ── */
 
 export default function FairnessPanel() {
@@ -244,6 +334,7 @@ export default function FairnessPanel() {
   const readyRef = useRef(false);
   const geoRef = useRef<GeoJSON.FeatureCollection | null>(null);
   const zonesRef = useRef<Record<string, FairnessZone>>({});
+  const activeLayerRef = useRef<LayerId>("city_vitality");
   const vitalityGeoJSON = useMemo(() => buildVitalityGeoJSON(), []);
 
   const isVitality = activeLayer === "city_vitality";
@@ -253,6 +344,7 @@ export default function FairnessPanel() {
   const day = DAYTIME_SNAPSHOT;
 
   useEffect(() => { zonesRef.current = zones; }, [zones]);
+  useEffect(() => { activeLayerRef.current = activeLayer; }, [activeLayer]);
 
   const updateChoropleth = useCallback(() => {
     const m = mapRef.current;
@@ -452,8 +544,7 @@ export default function FairnessPanel() {
         const props = e.features?.[0]?.properties;
         if (props) {
           popup.setLngLat(e.lngLat).setHTML(
-            `<strong>${props.name}</strong><br/>` +
-            `Score: ${(props.drop_ratio * 100).toFixed(0)}% &middot; Reference: ${(Number(props.day_value) * 100).toFixed(0)}% &middot; Value: ${(Number(props.night_value) * 100).toFixed(0)}%`
+            buildBoroughPopupHtml(props, activeLayerRef.current)
           ).addTo(m);
         }
       });
@@ -616,7 +707,7 @@ export default function FairnessPanel() {
           {!isVitality && (
             <div className="fairness-legend">
               <span className="fairness-legend-title">
-                Layer intensity [low &rarr; high]
+                {LAYER_EXPLAINER[activeLayer].legendTitle}
               </span>
               <div className="fairness-legend-bar" />
               <div className="fairness-legend-labels">
