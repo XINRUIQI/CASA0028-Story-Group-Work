@@ -163,6 +163,15 @@ const DATA_SOURCES: { name: string; url?: string }[] = [
   { name: "LLM" },
 ];
 
+const VIZ_LIBRARIES: { name: string; url?: string }[] = [
+  { name: "Mapbox GL JS", url: "https://docs.mapbox.com/mapbox-gl-js/" },
+  { name: "Lucide React", url: "https://lucide.dev/" },
+  { name: "Tailwind CSS v4", url: "https://tailwindcss.com/" },
+  { name: "Next.js", url: "https://nextjs.org/" },
+  { name: "React", url: "https://react.dev/" },
+  { name: "Native SVG" },
+];
+
 export default function ReflectionPage() {
   return (
     <section className="refl-page">
@@ -265,6 +274,32 @@ export default function ReflectionPage() {
           <h3 className="refl-footer-title">Data Sources</h3>
           <div className="refl-footer-sources">
             {DATA_SOURCES.map((s) =>
+              s.url ? (
+                <a
+                  key={s.name}
+                  href={s.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="refl-footer-link"
+                >
+                  {s.name}
+                </a>
+              ) : (
+                <span key={s.name} className="refl-footer-link">
+                  {s.name}
+                </span>
+              )
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Footer: Visualisation Libraries */}
+      <div className="refl-footer">
+        <div className="refl-footer-inner">
+          <h3 className="refl-footer-title">Visualisation Libraries</h3>
+          <div className="refl-footer-sources">
+            {VIZ_LIBRARIES.map((s) =>
               s.url ? (
                 <a
                   key={s.name}

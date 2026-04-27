@@ -69,6 +69,14 @@ export default function EndingPage() {
           </div>
         </div>
 
+        {/* Built With */}
+        <div className="final-credits">
+          <div className="final-credit-group">
+            <span className="final-credit-label">Built With</span>
+            <span className="final-credit-value">Next.js &middot; FastAPI &middot; Tailwind CSS &middot; Mapbox GL JS &middot; Lucide Icons</span>
+          </div>
+        </div>
+
         {/* Links */}
         <div className="final-links">
           <a
