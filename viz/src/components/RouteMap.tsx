@@ -1,0 +1,406 @@
+"use client";
+
+import { useRef, useEffect, useState } from "react";
+import type mapboxgl from "mapbox-gl";
+import "mapbox-gl/dist/mapbox-gl.css";
+import type { Leg } from "@/lib/api";
+
+const MAPBOX_TOKEN =
+  process.env.NEXT_PUBLIC_MAPBOX_TOKEN ||
+  "pk.eyJ1IjoibGV2aW5lbGl1IiwiYSI6ImNta21vc3doOTBleGYza3IycDNsOXRidXQifQ.SdtOnvfZEml6QGLmnnduDQ";
+
+type RouteMapTheme = "day" | "evening" | "night";
+
+const MAP_STYLES: Record<RouteMapTheme, string> = {
+  day: "mapbox://styles/mapbox/streets-v12",
+  evening: "mapbox://styles/mapbox/navigation-day-v1",
+  night: "mapbox://styles/mapbox/dark-v11",
+};
+
+const SIMPLE_BASEMAP_HIDDEN_LAYERS = [
+  /road/i,
+  /bridge/i,
+  /tunnel/i,
+  /street/i,
+  /traffic/i,
+  /poi/i,
+  /transit/i,
+  /building/i,
+  /park/i,
+  /landuse/i,
+  /landcover/i,
+  /hillshade/i,
+  /contour/i,
+  /path/i,
+  /pedestrian/i,
+  /rail/i,
+  /airport/i,
+];
+
+const SIMPLE_BASEMAP_KEEP_LAYERS = [
+  /background/i,
+  /water/i,
+  /place-label/i,
+  /settlement/i,
+  /country-label/i,
+  /state-label/i,
+  /admin/i,
+];
+
+function simplifyBasemap(map: mapboxgl.Map) {
+  const style = map.getStyle();
+  const layers = style.layers || [];
+
+  layers.forEach((layer) => {
+    const layerId = layer.id;
+    if (SIMPLE_BASEMAP_KEEP_LAYERS.some((pattern) => pattern.test(layerId))) {
+      return;
+    }
+    if (SIMPLE_BASEMAP_HIDDEN_LAYERS.some((pattern) => pattern.test(layerId))) {
+      map.setLayoutProperty(layerId, "visibility", "none");
+    }
+  });
+}
+
+function parseLineStringPath(path: string): [number, number][] | null {
+  if (!path.trim().startsWith("[[")) return null;
+
+  try {
+    const parsed = JSON.parse(path) as [number, number][];
+    if (!Array.isArray(parsed)) return null;
+    const coords = parsed
+      .filter((pair) => Array.isArray(pair) && pair.length >= 2)
+      .map(([lat, lon]) => [Number(lon), Number(lat)] as [number, number])
+      .filter(([lon, lat]) => Number.isFinite(lon) && Number.isFinite(lat));
+    return coords.length >= 2 ? coords : null;
+  } catch {
+    return null;
+  }
+}
+
+function decodePolyline(encoded: string): [number, number][] {
+  const coords: [number, number][] = [];
+  let index = 0;
+  let lat = 0;
+  let lng = 0;
+  while (index < encoded.length) {
+    let shift = 0;
+    let result = 0;
+    let byte: number;
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+    lat += result & 1 ? ~(result >> 1) : result >> 1;
+
+    shift = 0;
+    result = 0;
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+    lng += result & 1 ? ~(result >> 1) : result >> 1;
+
+    coords.push([lng / 1e5, lat / 1e5]);
+  }
+  return coords;
+}
+
+function legColor(leg: Leg): string {
+  if (leg.is_walking) return "#d4b77d";
+  if (leg.mode_id === "bus") return "#b8a472";
+  return "#c9a96e";
+}
+
+interface RouteMapProps {
+  legs: Leg[];
+  label: string;
+  /** Renders in native emoji colors (not affected by text color) */
+  labelEmoji?: string;
+  accent?: string;
+  supportCount?: number;
+  supportSummary?: string;
+  theme?: RouteMapTheme;
+}
+
+function RouteMapLabel({
+  label,
+  labelEmoji,
+  accent,
+}: {
+  label: string;
+  labelEmoji?: string;
+  accent: string;
+}) {
+  const full = [labelEmoji, label].filter(Boolean).join(" ");
+  return (
+    <div className="route-map-label" aria-label={full}>
+      {labelEmoji ? (
+        <>
+          <span className="route-map-label-emoji" aria-hidden>
+            {labelEmoji}
+          </span>
+          <span className="route-map-label-text" style={{ color: accent }}>
+            {label}
+          </span>
+        </>
+      ) : (
+        <span className="route-map-label-text" style={{ color: accent }}>{label}</span>
+      )}
+    </div>
+  );
+}
+
+function RouteMapFallback({
+  legs,
+  label,
+  labelEmoji,
+  accent = "var(--champagne-gold)",
+  supportCount,
+  supportSummary,
+  message,
+}: RouteMapProps & { message: string }) {
+  const transitCount = legs.filter((l) => !l.is_walking).length;
+  const walkCount = legs.filter((l) => l.is_walking).length;
+  const totalDuration = legs.reduce((sum, leg) => sum + (leg.duration_min || 0), 0);
+  const routeSummary = legs
+    .map((leg) => leg.summary || leg.mode)
+    .filter(Boolean)
+    .slice(0, 3)
+    .join(" · ");
+
+  return (
+    <div className="route-map-placeholder">
+      <RouteMapLabel label={label} labelEmoji={labelEmoji} accent={accent} />
+      <div className="route-map-empty">
+        <p>{message}</p>
+        {legs.length > 0 && (
+          <>
+            <p className="route-map-stats">
+              {transitCount} transit · {walkCount} walk segments
+              {totalDuration > 0 ? ` · ${Math.round(totalDuration)} min` : ""}
+            </p>
+            {routeSummary && (
+              <p className="route-map-summary">{routeSummary}</p>
+            )}
+          </>
+        )}
+      </div>
+      {(supportSummary || supportCount != null) && (
+        <div className="route-map-support">
+          {supportSummary || `${supportCount} support points nearby`}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function RouteMap({
+  legs,
+  label,
+  labelEmoji,
+  accent = "var(--champagne-gold)",
+  supportCount,
+  supportSummary,
+  theme = "evening",
+}: RouteMapProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<mapboxgl.Map | null>(null);
+  const [mapError, setMapError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!containerRef.current || !MAPBOX_TOKEN) return;
+    let cancelled = false;
+    let map: mapboxgl.Map | null = null;
+    setMapError(null);
+
+    const reportMapUnavailable = () => {
+      if (!cancelled) {
+        setMapError("Interactive map unavailable. Showing route summary instead.");
+      }
+    };
+
+    const initMap = async () => {
+      let mapboxglRuntime: typeof import("mapbox-gl").default;
+      try {
+        mapboxglRuntime = (await import("mapbox-gl")).default;
+      } catch {
+        reportMapUnavailable();
+        return;
+      }
+
+      if (cancelled || !containerRef.current) return;
+
+      try {
+        if (!mapboxglRuntime.supported()) {
+          reportMapUnavailable();
+          return;
+        }
+      } catch {
+        reportMapUnavailable();
+        return;
+      }
+
+      mapboxglRuntime.accessToken = MAPBOX_TOKEN;
+      let loaded = false;
+
+      try {
+        map = new mapboxglRuntime.Map({
+          container: containerRef.current,
+          style: MAP_STYLES[theme],
+          center: [-0.118, 51.509],
+          zoom: 11,
+          interactive: false,
+          attributionControl: false,
+        });
+      } catch {
+        reportMapUnavailable();
+        return;
+      }
+
+      mapRef.current = map;
+
+      map.on("error", () => {
+        if (!loaded) reportMapUnavailable();
+      });
+
+      map.on("load", () => {
+        loaded = true;
+
+        try {
+          if (!map) return;
+          const currentMap = map;
+          simplifyBasemap(currentMap);
+
+          const allCoords: [number, number][] = [];
+
+          legs.forEach((leg, i) => {
+            let coords: [number, number][] = [];
+            if (leg.path) {
+              coords = parseLineStringPath(leg.path) || decodePolyline(leg.path);
+            } else {
+              const depLat = leg.departure_point.lat;
+              const depLon = leg.departure_point.lon;
+              const arrLat = leg.arrival_point.lat;
+              const arrLon = leg.arrival_point.lon;
+              if (depLat != null && depLon != null && arrLat != null && arrLon != null) {
+                coords = [[depLon, depLat], [arrLon, arrLat]];
+              }
+            }
+
+            if (coords.length >= 2) {
+              allCoords.push(...coords);
+              currentMap.addSource(`route-${i}`, {
+                type: "geojson",
+                data: {
+                  type: "Feature",
+                  properties: {},
+                  geometry: { type: "LineString", coordinates: coords },
+                },
+              });
+              currentMap.addLayer({
+                id: `route-${i}`,
+                type: "line",
+                source: `route-${i}`,
+                layout: { "line-cap": "round", "line-join": "round" },
+                paint: {
+                  "line-color": legColor(leg),
+                  "line-width": leg.is_walking ? 3 : 4,
+                  "line-opacity": leg.is_walking ? 0.6 : 0.85,
+                  "line-dasharray": leg.is_walking ? [2, 2] : [1, 0],
+                },
+              });
+            }
+          });
+
+          legs.forEach((leg) => {
+            const dep = leg.departure_point;
+            if (dep.lat != null && dep.lon != null) {
+              const el = document.createElement("div");
+              el.className = "route-map-marker";
+              el.style.background = legColor(leg);
+              new mapboxglRuntime.Marker({ element: el, anchor: "center" })
+                .setLngLat([dep.lon, dep.lat])
+                .addTo(currentMap);
+            }
+          });
+          const lastLeg = legs[legs.length - 1];
+          if (lastLeg) {
+            const arr = lastLeg.arrival_point;
+            if (arr.lat != null && arr.lon != null) {
+              const el = document.createElement("div");
+              el.className = "route-map-marker";
+              el.style.background = "#d4946a";
+              new mapboxglRuntime.Marker({ element: el, anchor: "center" })
+                .setLngLat([arr.lon, arr.lat])
+                .addTo(currentMap);
+            }
+          }
+
+          if (allCoords.length >= 2) {
+            const lngs = allCoords.map((c) => c[0]);
+            const lats = allCoords.map((c) => c[1]);
+            currentMap.fitBounds(
+              [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+              { padding: 30, duration: 0 },
+            );
+          }
+        } catch {
+          reportMapUnavailable();
+        }
+      });
+    };
+
+    void initMap();
+
+    return () => {
+      cancelled = true;
+      map?.remove();
+      if (mapRef.current === map) mapRef.current = null;
+    };
+  }, [legs, theme]);
+
+  if (!MAPBOX_TOKEN) {
+    return (
+      <RouteMapFallback
+        legs={legs}
+        label={label}
+        labelEmoji={labelEmoji}
+        accent={accent}
+        supportCount={supportCount}
+        supportSummary={supportSummary}
+        theme={theme}
+        message="Map token unavailable. Showing route summary instead."
+      />
+    );
+  }
+
+  if (mapError) {
+    return (
+      <RouteMapFallback
+        legs={legs}
+        label={label}
+        labelEmoji={labelEmoji}
+        accent={accent}
+        supportCount={supportCount}
+        supportSummary={supportSummary}
+        theme={theme}
+        message={mapError}
+      />
+    );
+  }
+
+  return (
+    <div className="route-map-card">
+      <RouteMapLabel label={label} labelEmoji={labelEmoji} accent={accent} />
+      <div ref={containerRef} className="route-map-container" />
+      {(supportSummary || supportCount != null) && (
+        <div className="route-map-support">
+          {supportSummary || `${supportCount} support points nearby`}
+        </div>
+      )}
+    </div>
+  );
+}
