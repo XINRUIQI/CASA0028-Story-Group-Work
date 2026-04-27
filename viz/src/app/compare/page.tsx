@@ -22,6 +22,7 @@ import { type ContextTag, CONTEXT_LABELS } from "@/lib/types";
 import { getStaticDataRoot } from "@/lib/publicBasePath";
 import {
   api,
+  hasLiveBackend,
   type CompareResult,
   type CompareCardsResult,
   type CardData,
@@ -352,6 +353,12 @@ function CompareContent() {
     setError("");
 
     const loadRecoveryProfiles = (compare: CompareResult) => {
+      /* Recovery profiles need a live backend: leg-array params are too long
+         for our static-key scheme and there are no pre-fetched files for
+         them. On the static deploy we skip this entirely; OptionCard has
+         a fallback that estimates recovery from waiting + uncertainty cards. */
+      if (!hasLiveBackend) return;
+
       const entries = Object.entries(compare.options);
       if (entries.length === 0) return;
       Promise.all(
@@ -432,6 +439,12 @@ function CompareContent() {
           };
           _preloadCache.set(cacheKey, snap);
           applySnapshot(snap);
+          /* Static is enough — done. The live-API refinement step below only
+             runs when a backend is configured. */
+          if (!hasLiveBackend) return;
+        } else if (!hasLiveBackend) {
+          /* Static missed and no backend to fall back to. */
+          throw new Error("Could not load comparison data for this journey.");
         }
 
         return api.compareCards(origin, destination, times)
@@ -516,7 +529,7 @@ function CompareContent() {
     <div className="compare-page">
       <div ref={revealRef} className="max-w-6xl mx-auto px-6 pt-20 pb-16">
       {/* ── Header ── */}
-      <section className="reveal-section mb-12">
+      <section className="reveal-section mb-6">
         <h1 className="text-3xl font-bold mb-3">
           Compare Journeys Across Time
         </h1>
@@ -525,9 +538,6 @@ function CompareContent() {
           The route stays the same. The city around it does not.
         </blockquote>
 
-        <p className="mb-3" style={{ color: "var(--text-secondary)" }}>
-          A journey is not only about where you go, but when you leave.
-        </p>
         <p className="mb-2" style={{ color: "var(--text-secondary)" }}>
           This prototype compares departure-time options through waiting,
           support, reliability, backup options, and route exposure — helping
@@ -536,7 +546,9 @@ function CompareContent() {
       </section>
 
       {/* ── Narrative overlay: anchor the comparison in a protagonist ── */}
-      <section className="reveal-section mb-8">
+      {/* Extra bottom margin reserves room for the absolutely-positioned
+          .choose-persona-bubble that floats above the persona row below. */}
+      <section className="reveal-section mb-16">
         <JourneyNarrative
           persona={persona}
           originName={originName}

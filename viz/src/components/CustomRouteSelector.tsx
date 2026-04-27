@@ -50,17 +50,17 @@ export default function CustomRouteSelector({
   const [destination, setDestination] = useState(currentDestination || "");
 
   /* Sync local state when parent navigates (URL change → new currentOrigin).
-     Without this the parent's prop would silently override every dropdown
-     change because of value-priority logic in earlier versions. */
+     Also reset to empty when the parent clears its value, so that switching
+     into custom mode without explicit URL params shows the placeholder. */
   useEffect(() => {
-    if (currentOrigin && currentOrigin !== origin) setOrigin(currentOrigin);
+    const next = currentOrigin ?? "";
+    if (next !== origin) setOrigin(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentOrigin]);
 
   useEffect(() => {
-    if (currentDestination && currentDestination !== destination) {
-      setDestination(currentDestination);
-    }
+    const next = currentDestination ?? "";
+    if (next !== destination) setDestination(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentDestination]);
 

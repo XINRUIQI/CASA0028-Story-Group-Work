@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
+import { getPublicBasePath } from "@/lib/publicBasePath";
 
 export default function EndingPage() {
   const router = useRouter();
   const [visible, setVisible] = useState(false);
+  const pageStyle = {
+    "--final-cover-image": `url("${getPublicBasePath()}/background4.png")`,
+  } as CSSProperties;
 
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 400);
@@ -13,7 +17,7 @@ export default function EndingPage() {
   }, []);
 
   return (
-    <section className="final-page">
+    <section className="final-page" style={pageStyle}>
       {/* Subtle silver-gray London road network */}
       <div className="final-map-bg" />
 
@@ -23,11 +27,25 @@ export default function EndingPage() {
       <div className={`final-content ${visible ? "final-visible" : ""}`}>
         {/* Main quote */}
         <blockquote className="final-quote">
-          &ldquo;The goal is not to declare the city safe or unsafe&nbsp;&mdash;
-          <br />
-          but to show how support, waiting, and recovery
-          <br />
-          change after dark, and why that matters.&rdquo;
+          <p className="final-quote-para">
+            A better city is not only one that moves quickly,
+            <br />
+            but one that remains usable at different times of day.
+          </p>
+          <p className="final-quote-para">
+            Future journey planning should make visible the support,
+            <br />
+            uncertainty, and choices that shape how people travel
+            <br />
+            from day to night.
+          </p>
+          <p className="final-quote-para">
+            In doing so, it can help imagine a city where studying late,
+            <br />
+            working late, meeting friends, or enjoying the evening
+            <br />
+            does not mean facing the journey home alone or unseen.
+          </p>
         </blockquote>
 
         {/* Closing line */}
@@ -37,7 +55,7 @@ export default function EndingPage() {
         <div className="final-credits">
           <div className="final-credit-group">
             <span className="final-credit-label">Project</span>
-            <span className="final-credit-value">Day and Night: How the Same Journey Changes</span>
+            <span className="final-credit-value">The Same Way Home</span>
           </div>
           <div className="final-credit-divider" />
           <div className="final-credit-group">
@@ -48,13 +66,6 @@ export default function EndingPage() {
           <div className="final-credit-group">
             <span className="final-credit-label">Course</span>
             <span className="final-credit-value">CASA0028 &mdash; Story Group Work &middot; UCL CASA &middot; 2026</span>
-          </div>
-        </div>
-
-        <div className="final-credits">
-          <div className="final-credit-group">
-            <span className="final-credit-label">Built With</span>
-            <span className="final-credit-value">Next.js &middot; FastAPI &middot; Tailwind CSS &middot; Mapbox &middot; Lucide Icons</span>
           </div>
         </div>
 

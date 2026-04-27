@@ -25,11 +25,25 @@ export default function Navbar() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const showBg = !isHome || scrolled;
+  const isEnding = pathname === "/ending";
+  // Both Home and the Thoughts page use a hero-style cover image, so the nav
+  // stays fully transparent on top until the user scrolls past the hero.
+  const isCover = isHome || isEnding;
+  const showBg = !isCover || scrolled;
 
-  // Unified dusk-themed frosted nav across all pages
-  const navBackground = showBg ? "rgba(46, 36, 96, 0.55)" : "transparent";
-  const navBorder = showBg ? "rgba(240, 184, 122, 0.22)" : "transparent";
+  // Unified dusk-themed frosted nav across all pages.
+  // The Thoughts page (background4.png) is a day/night split image, so we use
+  // a warm amber-dusk wash with a soft gold border to bridge both halves.
+  const navBackground = showBg
+    ? isEnding
+      ? "rgba(150, 95, 65, 0.40)"
+      : "rgba(46, 36, 96, 0.55)"
+    : "transparent";
+  const navBorder = showBg
+    ? isEnding
+      ? "rgba(245, 198, 130, 0.34)"
+      : "rgba(240, 184, 122, 0.22)"
+    : "transparent";
 
   const brandColor = "#fef5e8";
   const brandAccent = "#f0b87a";

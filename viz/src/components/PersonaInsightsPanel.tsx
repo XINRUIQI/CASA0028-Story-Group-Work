@@ -85,9 +85,9 @@ const CHART_LINES = [
 
 const PERSONA_HIGHLIGHT_KEYS: Partial<Record<PersonaId, string[]>> = {
   student: ["duration_min"],
-  budget: ["duration_min", "support_open"],
+  budget: ["waiting_burden", "recovery_penalty"],
   nightworker: ["recovery_penalty"],
-  unfamiliar: ["waiting_burden"],
+  unfamiliar: ["support_open"],
 };
 
 function smoothPath(points: [number, number][]): string {
@@ -320,7 +320,7 @@ export default function PersonaInsightsPanel({
                     className="choose-persona-img"
                   />
                 </div>
-                <span className="choose-persona-name">[{p.label}]</span>
+                <span className="choose-persona-name">{p.label}</span>
               </button>
             </div>
           );

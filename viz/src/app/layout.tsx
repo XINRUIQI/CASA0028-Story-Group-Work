@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Day and Night — How the Same Journey Changes",
+  title: "The Same Way Home",
   description:
     "Compare how the same route changes after dark in waiting, support, activity, and uncertainty.",
 };

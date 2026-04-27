@@ -4,6 +4,11 @@ import { getPublicBasePath } from "./publicBasePath";
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || "").trim().replace(/\/$/, "");
 const USE_LIVE_API = API_BASE.length > 0;
 
+/** True when a live FastAPI backend is configured via NEXT_PUBLIC_API_BASE.
+ * Components should use this to skip optional refinements that only make
+ * sense with a live backend (e.g. journey-recovery for arbitrary leg arrays). */
+export const hasLiveBackend = USE_LIVE_API;
+
 /**
  * Build a deterministic file path for a pre-fetched static JSON response.
  * Must stay in sync with data/scripts/prefetch_static.py → static_key().

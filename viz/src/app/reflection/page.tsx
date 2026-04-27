@@ -151,7 +151,7 @@ const FUTURE_ITEMS = [
   "Incorporate seasonal factors — daylight hours, weather, and holiday schedules.",
 ];
 
-const DATA_SOURCES = [
+const DATA_SOURCES: { name: string; url?: string }[] = [
   { name: "TfL Unified API", url: "https://api.tfl.gov.uk/" },
   { name: "OpenStreetMap", url: "https://www.openstreetmap.org/" },
   { name: "NHS APIs", url: "https://digital.nhs.uk/developer/api-catalogue" },
@@ -160,6 +160,7 @@ const DATA_SOURCES = [
   { name: "GLA London Datastore", url: "https://data.london.gov.uk/" },
   { name: "NASA Black Marble", url: "https://blackmarble.gsfc.nasa.gov/" },
   { name: "NaPTAN / DfT", url: "https://www.data.gov.uk/dataset/ff93ffc1-6656-47d8-9155-85ea0b8f2251/national-public-transport-access-nodes-naptan" },
+  { name: "LLM" },
 ];
 
 export default function ReflectionPage() {
@@ -170,7 +171,7 @@ export default function ReflectionPage() {
 
       {/* Title */}
       <div className="refl-header">
-        <h1 className="refl-title">Reflection &amp; Limits</h1>
+        <h1 className="refl-title">Reflection &amp; Limitations</h1>
         <blockquote className="story-pull-quote story-pull-quote--center">
           We did not set out to declare a route safe.
           <br />
@@ -214,12 +215,10 @@ export default function ReflectionPage() {
             </li>
           ))}
         </ol>
-        <p className="refl-echo-bridge">
-          What follows is the methodology behind that attempt — what the
-          tool helps with, what it cannot know, and where it might still
-          mislead.
-        </p>
       </section>
+
+      {/* Section divider into methodology grid */}
+      <p className="refl-echo-bridge">How we built it</p>
 
       {/* 2×2 card grid */}
       <div className="refl-grid">
@@ -255,8 +254,9 @@ export default function ReflectionPage() {
 
       {/* Closing quote */}
       <blockquote className="refl-quote">
-        &ldquo;The goal is not to label the city as safe or unsafe. It is to show how
-        waiting, support, reliability, and recovery change after dark&nbsp;&mdash; and why those changes matter.&rdquo;
+        &ldquo;The goal is not to declare a journey safe or unsafe&nbsp;&mdash;
+        but to show how support, waiting, and recovery change
+        from day to night, and why those changes matter.&rdquo;
       </blockquote>
 
       {/* Footer: Data Sources */}
@@ -264,17 +264,23 @@ export default function ReflectionPage() {
         <div className="refl-footer-inner">
           <h3 className="refl-footer-title">Data Sources</h3>
           <div className="refl-footer-sources">
-            {DATA_SOURCES.map((s) => (
-              <a
-                key={s.name}
-                href={s.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="refl-footer-link"
-              >
-                {s.name}
-              </a>
-            ))}
+            {DATA_SOURCES.map((s) =>
+              s.url ? (
+                <a
+                  key={s.name}
+                  href={s.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="refl-footer-link"
+                >
+                  {s.name}
+                </a>
+              ) : (
+                <span key={s.name} className="refl-footer-link">
+                  {s.name}
+                </span>
+              )
+            )}
           </div>
         </div>
       </div>

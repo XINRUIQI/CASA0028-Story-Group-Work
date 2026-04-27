@@ -14,7 +14,7 @@ export default function FairnessPage() {
           ← Compare a journey
         </Link>
         <Link href="/reflection" className="refl-nav-btn refl-nav-secondary">
-          Reflection & limits →
+          Reflection & limitations →
         </Link>
       </div>
     </div>

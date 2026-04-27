@@ -14,7 +14,7 @@ const IMG_PREFIX = process.env.NEXT_PUBLIC_BASE_PATH || "";
 interface PersonaNarrativeMeta {
   /** First name. `null` for the custom traveller (no fictional name). */
   name: string | null;
-  /** "Maya / James / …" or "You". */
+  /** "James / Aisha / …" or "You". */
   display: string;
   /** Pronoun pair: subject / object / possessive. */
   pronoun: { subject: string; possessive: string };
@@ -28,26 +28,26 @@ interface PersonaNarrativeMeta {
 
 const PERSONA_NARRATIVE: Record<PersonaId, PersonaNarrativeMeta> = {
   student: {
-    name: "Maya",
-    display: "Maya",
-    pronoun: { subject: "she", possessive: "her" },
+    name: "James",
+    display: "James",
+    pronoun: { subject: "he", possessive: "his" },
     setup: "has just finished studying late",
-    concern: "what worries her most is a route that suddenly takes much longer",
+    concern: "what worries him most is a route that suddenly takes much longer",
     image: "/01_late_night_student.png",
     accent: "var(--champagne-gold)",
   },
   budget: {
-    name: "James",
-    display: "James",
-    pronoun: { subject: "he", possessive: "his" },
+    name: "Aisha",
+    display: "Aisha",
+    pronoun: { subject: "she", possessive: "her" },
     setup: "is heading back with two heavy bags",
-    concern: "he wants less walking, less waiting, fewer changes",
+    concern: "she wants less walking, less waiting, fewer changes",
     image: "/02_passenger_with_luggage.png",
     accent: "var(--accent-amber)",
   },
   nightworker: {
-    name: "Aisha",
-    display: "Aisha",
+    name: "Maya",
+    display: "Maya",
     pronoun: { subject: "she", possessive: "her" },
     setup: "has just clocked off a long night shift",
     concern: "she needs services that still run, and that she can rely on",
@@ -55,12 +55,12 @@ const PERSONA_NARRATIVE: Record<PersonaId, PersonaNarrativeMeta> = {
     accent: "var(--accent-emerald)",
   },
   unfamiliar: {
-    name: "Tom",
-    display: "Tom",
-    pronoun: { subject: "he", possessive: "his" },
-    setup: "is heading back at the end of his first day in London",
+    name: "Sofia",
+    display: "Sofia",
+    pronoun: { subject: "she", possessive: "her" },
+    setup: "is heading back at the end of her first day in London",
     concern:
-      "he wants a simple route — and someone nearby in case something goes wrong",
+      "she wants a simple route — and someone nearby in case something goes wrong",
     image: "/04_first_time_visitor.png",
     accent: "var(--accent-rose)",
   },
