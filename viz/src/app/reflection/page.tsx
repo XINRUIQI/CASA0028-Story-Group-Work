@@ -50,11 +50,10 @@ const ECHO_BLOCKS: {
     accent: "var(--accent-rose)",
     body: (
       <>
-        Surveys of women, disabled and minority-ethnic passengers show
-        again and again that night-time public transport is not simply an
-        inconvenience — it is a constant calculation about which routes
-        feel possible at all.
-        <sup className="refl-echo-ref">[1]</sup> Those calculations rarely
+        Evidence from disabled passengers and TfL's equality work shows
+        that night-time public transport is shaped by unequal access,
+        confidence and support, not simply by inconvenience.
+        <sup className="refl-echo-ref">[1][2]</sup> Those calculations rarely
         make it into the data planners use. The journeys most likely to be
         silently re-routed, postponed, or never taken are also the ones
         that show up the least in headline statistics.
@@ -81,13 +80,15 @@ const ECHO_BLOCKS: {
 const ECHO_REFERENCES: { id: string; label: string; url?: string }[] = [
   {
     id: "1",
-    label: "Transport for All — Pave the Way (2023)",
-    url: "https://www.transportforall.org.uk/campaigns/pave-the-way/",
+    label:
+      "Transport for All. (2023). Are we there yet? Barriers to transport for disabled people in 2023.",
+    url: "https://www.transportforall.org.uk/wp-content/uploads/2023/12/NATS_Full_PDF.pdf",
   },
   {
-    id: "1",
-    label: "TfL Women's Safety on Transport survey series",
-    url: "https://tfl.gov.uk/info-for/media/press-releases",
+    id: "2",
+    label:
+      "Transport for London. (2016). Action on Equality: TfL's Commitments to 2020.",
+    url: "https://content.tfl.gov.uk/action-on-equality-tfls-commitments-to-2020.pdf",
   },
 ];
 
