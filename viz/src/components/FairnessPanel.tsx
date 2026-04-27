@@ -183,13 +183,20 @@ const LAYER_EXPLAINER: Record<LayerId, {
     hint: "Higher means the area becomes much quieter after dark.",
   },
   low_light_walking_burden: {
-    legendTitle: "Exposed walking [low --> high]",
-    issueLabel: "Exposed walking",
+    legendTitle: "Exposed walking [lower --> higher relative exposure]",
+    issueLabel: "Relative exposure rank",
     dayLabel: "Day support context",
     nightLabel: "Night support context",
     hint: "Higher means more walking through places with weaker late-night support.",
   },
 };
+
+function getLegendLabels(layer: LayerId): string[] {
+  if (layer === "low_light_walking_burden") {
+    return ["Lower", "Typical", "Higher"];
+  }
+  return ["0%", "20%", "40%", "60%", "80%"];
+}
 
 function dropColor(ratio: number, min = 0, max = 0.8): string {
   const span = Math.max(max - min, 0.001);
@@ -212,6 +219,7 @@ function extractBorough(msoaName: string): string {
 function mergeGeoWithZones(
   geo: GeoJSON.FeatureCollection,
   zoneData: Record<string, FairnessZone>,
+  layer: LayerId,
 ): GeoJSON.FeatureCollection {
   const boroughBuckets: Record<string, FairnessZone[]> = {};
   for (const z of Object.values(zoneData)) {
@@ -220,18 +228,21 @@ function mergeGeoWithZones(
     boroughBuckets[borough].push(z);
   }
 
-  const boroughAgg: Record<string, { drop: number; day: number; night: number }> = {};
+  const boroughAgg: Record<string, { drop: number; day: number; night: number; percentile: number }> = {};
   for (const [borough, list] of Object.entries(boroughBuckets)) {
     const n = list.length;
     boroughAgg[borough] = {
       drop: list.reduce((s, z) => s + z.drop_ratio, 0) / n,
       day: list.reduce((s, z) => s + z.day_value, 0) / n,
       night: list.reduce((s, z) => s + z.night_value, 0) / n,
+      percentile: list.reduce((s, z) => s + (z.percentile ?? 0), 0) / n,
     };
   }
-  const drops = Object.values(boroughAgg).map((agg) => Math.abs(agg.drop));
-  const minDrop = Math.min(...drops, 0);
-  const maxDrop = Math.max(...drops, 0.001);
+  const colorValues = Object.values(boroughAgg).map((agg) =>
+    layer === "low_light_walking_burden" ? agg.percentile : Math.abs(agg.drop),
+  );
+  const minColorValue = layer === "low_light_walking_burden" ? 0 : Math.min(...colorValues, 0);
+  const maxColorValue = layer === "low_light_walking_burden" ? 1 : Math.max(...colorValues, 0.001);
 
   return {
     type: "FeatureCollection",
@@ -245,7 +256,14 @@ function mergeGeoWithZones(
           drop_ratio: agg ? Math.abs(agg.drop) : 0,
           day_value: agg ? agg.day : 0,
           night_value: agg ? agg.night : 0,
-          fill_color: agg ? dropColor(agg.drop, minDrop, maxDrop) : "rgba(40,50,90,0.5)",
+          percentile: agg ? agg.percentile : 0,
+          fill_color: agg
+            ? dropColor(
+                layer === "low_light_walking_burden" ? agg.percentile : agg.drop,
+                minColorValue,
+                maxColorValue,
+              )
+            : "rgba(40,50,90,0.5)",
         },
       };
     }),
@@ -309,12 +327,14 @@ function formatLayerValue(layer: LayerId, value: number): string {
 function buildBoroughPopupHtml(props: mapboxgl.GeoJSONFeature["properties"], layer: LayerId): string {
   const copy = LAYER_EXPLAINER[layer];
   const dropRatio = Number(props?.drop_ratio);
+  const percentile = Number(props?.percentile);
   const dayValue = Number(props?.day_value);
   const nightValue = Number(props?.night_value);
+  const headlineValue = layer === "low_light_walking_burden" ? percentile : dropRatio;
 
   return (
     `<strong>${escapeHtml(props?.name)}</strong><br/>` +
-    `${copy.issueLabel}: ${formatPercent(dropRatio)}<br/>` +
+    `${copy.issueLabel}: ${formatPercent(headlineValue)}<br/>` +
     `${copy.dayLabel}: ${formatLayerValue(layer, dayValue)}<br/>` +
     `${copy.nightLabel}: ${formatLayerValue(layer, nightValue)}<br/>` +
     `<span class="fairness-popup-hint">${copy.hint}</span>`
@@ -351,7 +371,7 @@ export default function FairnessPanel() {
     if (!m || !readyRef.current || !geoRef.current) return;
     const src = m.getSource("boroughs") as mapboxgl.GeoJSONSource | undefined;
     if (!src) return;
-    src.setData(mergeGeoWithZones(geoRef.current, zonesRef.current));
+    src.setData(mergeGeoWithZones(geoRef.current, zonesRef.current, activeLayerRef.current));
   }, []);
 
   /* Fetch borough GeoJSON once */
@@ -501,7 +521,7 @@ export default function FairnessPanel() {
 
       // Choropleth layers
       const initData = geoRef.current
-        ? mergeGeoWithZones(geoRef.current, zonesRef.current)
+        ? mergeGeoWithZones(geoRef.current, zonesRef.current, activeLayerRef.current)
         : EMPTY_FC;
 
       m.addSource("boroughs", { type: "geojson", data: initData });
@@ -711,11 +731,9 @@ export default function FairnessPanel() {
               </span>
               <div className="fairness-legend-bar" />
               <div className="fairness-legend-labels">
-                <span>0%</span>
-                <span>20%</span>
-                <span>40%</span>
-                <span>60%</span>
-                <span>80%</span>
+                {getLegendLabels(activeLayer).map((label) => (
+                  <span key={label}>{label}</span>
+                ))}
               </div>
             </div>
           )}
