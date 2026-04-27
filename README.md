@@ -8,10 +8,11 @@ The prototype is designed as an interactive decision-support tool. Instead of on
 
 ## Pages
 
-1. **Landing** — introduces the project and allows users to start with a journey context.
-2. **Compare** — compares the same journey across different night-time departure slots.
-3. **Unpack** — breaks the journey into segments and explains the conditions around each stage.
-4. **Reflection** — discusses the strengths, limitations, and ethical considerations of the prototype.
+1. **Home** — introduces the project and lets users choose a travel context before starting the journey comparison.
+2. **Compare** — compares the same route across daytime, evening, and late-night departure times, using maps, journey cards, timelines, and contextual indicators.
+3. **Fairness** — presents spatial fairness layers and explains how night-time support, activity, lighting, waiting, and recovery vary across London.
+4. **Reflection** — discusses what the prototype can help reveal, what it cannot measure directly, and the ethical limits of using data to represent night-time travel experience.
+5. **Ending** — closes the story with project credits, data sources, tools, and links.
 
 ## Data Sources
 
